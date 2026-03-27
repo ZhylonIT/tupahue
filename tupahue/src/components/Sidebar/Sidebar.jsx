@@ -4,7 +4,7 @@ import {
   Dashboard, People, BarChart, Event as EventIcon, 
   FolderShared, AccountBalanceWallet, Campaign, 
   AdminPanelSettings, Engineering, School,
-  Assignment // Icono para Planificaciones
+  Assignment 
 } from '@mui/icons-material';
 import { RAMAS } from '../../constants/ramas.jsx';
 import { FUNCIONES } from '../../constants/auth.jsx';
@@ -53,39 +53,59 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
   }, [userFuncion, ramaSeleccionada]);
 
   const menuItems = useMemo(() => {
-    const base = [{ id: 'dashboard', label: 'Inicio', icon: <Dashboard />, vista: 'DASHBOARD' }];
-    
-    // Vista para Jefe de Grupo
-    if (userFuncion === FUNCIONES.JEFE_GRUPO) {
-      return [
-        ...base, 
-        { id: 'nomina_global', label: 'Nómina Global', icon: <People />, vista: 'NOMINA_GLOBAL' }, 
-        { id: 'progresion', label: 'Progresión', icon: <BarChart />, vista: 'PROGRESION' }, 
-        { id: 'planificaciones', label: 'Planificaciones', icon: <Assignment />, vista: 'PLANIFICACIONES' }, // Agregado aquí también
-        { id: 'finanzas', label: 'Finanzas', icon: <AccountBalanceWallet />, vista: 'FINANZAS' }, 
-        { id: 'calendario', label: 'Calendario', icon: <EventIcon />, vista: 'CALENDARIO' }, 
-        { id: 'noticias', label: 'Comunicaciones', icon: <Campaign />, vista: 'COMUNICACIONES' }
-      ];
-    }
-
-    // Vista para Asistente Administrativo
-    if (userFuncion === FUNCIONES.ASISTENTE_ADM) {
-      return [
-        ...base, 
-        { id: 'finanzas', label: 'Cuotas y Pagos', icon: <AccountBalanceWallet />, vista: 'FINANZAS' }, 
-        { id: 'nominas_global', label: 'Nóminas Globales', icon: <People />, vista: 'NOMINA_GLOBAL' }
-      ];
-    }
-
-    // VISTA PARA EDUCADORES DE RAMA (Default)
-    return [
-      ...base, 
-      { id: 'nomina', label: 'Mi Rama', icon: <People />, vista: 'NOMINA' }, 
-      { id: 'progresion', label: 'Progresión', icon: <BarChart />, vista: 'PROGRESION' }, 
-      { id: 'planificaciones', label: 'Planificaciones', icon: <Assignment />, vista: 'PLANIFICACIONES' }, // <--- AGREGADO
-      { id: 'calendario', label: 'Calendario', icon: <EventIcon />, vista: 'CALENDARIO' }, 
-      { id: 'documentos', label: 'Fichas Médicas', icon: <FolderShared />, vista: 'DOCUMENTOS' }
+    // 1. Items base que todos ven
+    const items = [
+      { id: 'dashboard', label: 'Inicio', icon: <Dashboard />, vista: 'DASHBOARD' }
     ];
+
+    const esJefe = userFuncion === FUNCIONES.JEFE_GRUPO;
+
+    // --- Lógica para Educadores de Rama y Asistente de Programa ---
+    const esEducadorDeRama = [
+      FUNCIONES.LOBATOS, 
+      FUNCIONES.SCOUTS, 
+      FUNCIONES.CAMINANTES, 
+      FUNCIONES.ROVERS
+    ].includes(userFuncion);
+    
+    const esAsistenteProg = userFuncion === FUNCIONES.ASISTENTE_PROG;
+
+    if (esJefe || esEducadorDeRama || esAsistenteProg) {
+      items.push(
+        { 
+          id: 'nomina', 
+          label: esJefe || esAsistenteProg ? 'Nómina Global' : 'Mi Rama', 
+          icon: <People />, 
+          vista: esJefe || esAsistenteProg ? 'NOMINA_GLOBAL' : 'NOMINA' 
+        },
+        { id: 'progresion', label: 'Progresión', icon: <BarChart />, vista: 'PROGRESION' },
+        { id: 'planificaciones', label: 'Planificaciones', icon: <Assignment />, vista: 'PLANIFICACIONES' }
+      );
+    }
+
+    // --- Lógica para Asistente Administrativo ---
+    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_ADM) {
+      items.push({ id: 'finanzas', label: 'Finanzas', icon: <AccountBalanceWallet />, vista: 'FINANZAS' });
+    }
+
+    // --- Lógica para Asistente de Comunicaciones ---
+    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_COM) {
+      items.push({ 
+        id: 'noticias', 
+        label: 'Panel de noticias', 
+        icon: <Campaign />, 
+        vista: 'NOTICIAS' // Coincide con el case 'NOTICIAS' en EducadorMainView
+      });
+    }
+
+    // --- Calendario y Documentos ---
+    items.push({ id: 'calendario', label: 'Calendario', icon: <EventIcon />, vista: 'CALENDARIO' });
+    
+    if (esJefe || esEducadorDeRama || userFuncion === FUNCIONES.ASISTENTE_ADM) {
+      items.push({ id: 'documentos', label: 'Fichas Médicas', icon: <FolderShared />, vista: 'DOCUMENTOS' });
+    }
+
+    return items;
   }, [userFuncion]);
 
   const handleSelectRol = (nuevoRol) => {

@@ -6,11 +6,15 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Login, Email } from '@mui/icons-material';
 import logoTupahue from '../assets/images/logo.png';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // 👈 Importamos el hook de auth
 
 const VIOLETA_SCOUT = '#5A189A';
 
 export const LoginPage = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth(); // 👈 Obtenemos la función login
+
   // --- ESTADOS LOGIN ---
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,13 +31,25 @@ export const LoginPage = () => {
   const isEmailInvalid = email !== '' && !email.includes('@');
   const isRecoverEmailInvalid = emailRecover !== '' && !emailRecover.includes('@');
 
-  // Manejador Login
+  // Manejador Login MODIFICADO
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!email || !password || isEmailInvalid) return;
     setLoading(true);
-    // Simulación API
-    setTimeout(() => setLoading(false), 2000);
+
+    // Simulación API con AuthContext
+    setTimeout(() => {
+      const mockUser = {
+        email: email,
+        name: 'Asistente de Comunicaciones',
+        role: 'comunicaciones', // Rol clave para el Dashboard
+        token: 'fake-jwt-token-tupahue'
+      };
+
+      login(mockUser); // Guardamos en el contexto y localStorage
+      setLoading(false);
+      navigate('/dashboard'); // 👈 Redirigimos al Dashboard
+    }, 2000);
   };
 
   // Manejador Recuperación
@@ -42,11 +58,9 @@ export const LoginPage = () => {
     if (!emailRecover || isRecoverEmailInvalid) return;
     
     setRecoverLoading(true);
-    // Simulación de envío de correo
     setTimeout(() => {
       setRecoverLoading(false);
       setRecoverSent(true);
-      // Cerramos el modal automáticamente tras 4 segundos del mensaje de éxito
       setTimeout(() => {
         setOpenRecover(false);
         setRecoverSent(false);
@@ -176,7 +190,7 @@ export const LoginPage = () => {
           <DialogContent>
             {recoverSent ? (
               <Alert severity="success" sx={{ borderRadius: 2 }}>
-                Instrucciones enviadas. Revisá tu casilla de correo (y la carpeta de spam).
+                Instrucciones enviadas. Revisá tu casilla de correo.
               </Alert>
             ) : (
               <>

@@ -1,0 +1,79 @@
+Qué bueno que pudiste solucionar ese dolor de cabeza del editor. Esos errores "fantasma" de caché son un clásico.
+
+Acá tenés tu README actualizado y ampliado, reflejando todo el avance enorme que hicimos conectando el panel de control con la vista pública, el rediseño del Hero y el ruteo dinámico.
+
+Podés copiar este texto directamente a tu archivo README.md:
+
+Sistema Integral del Grupo Scout "Tupahue"
+1. Visión General y Arquitectura
+Estructura Dual:
+
+Landing Page Pública: Sitio web para padres y comunidad con carrusel de noticias, información de ramas, historia y contacto.
+
+Panel de Control (Backoffice): Sistema de gestión interna con acceso restringido por roles.
+
+Tecnologías:
+
+React 19, Vite, React Router DOM para navegación dinámica.
+
+Material UI (MUI) para el diseño de interfaces.
+
+JavaScript.
+
+Persistencia:
+Todo el proyecto (noticias, nóminas, eventos) se gestiona y guarda en LocalStorage para simular una base de datos real y visualizar cambios persistentes en el navegador sin depender de un backend en esta etapa.
+
+2. Sistema de Roles y Accesos
+El sistema de gestión interna (Dashboard) es dinámico y adapta sus funciones según el rol del usuario logueado:
+
+Jefe de Grupo: Acceso total a todas las herramientas (Nómina, Progresión, Prensa, Documentos).
+
+Educador de Rama: Acceso a funciones pedagógicas (Asistencia, Progresión de su rama, Planificaciones).
+
+Asistente de Comunicaciones: Acceso específico al módulo de Noticias/Prensa para administrar la Landing Page.
+
+3. Lógica de Navegación (EducadorMainView)
+El archivo src/views/educador/index.jsx centraliza la lógica de renderizado del panel:
+
+Recibe la prop vistaActual (ID de la herramienta) y userFuncion (Rol).
+
+Utiliza un switch para devolver el componente correspondiente (NominaView, NoticiasView, etc.).
+
+Mantiene una paleta institucional: Azul Oscuro (#1a5276) y Violeta Scout (#5A189A).
+
+4. Módulo de Gestión de Prensa (CMS - Backoffice)
+Puente funcional entre el Panel de Control y la Landing Page Pública.
+
+NoticiasView.jsx: Tabla administrativa que permite Crear, Editar, Borrar y cambiar el estado (Borrador/Publicado) de las noticias.
+
+NoticiaForm.jsx: Formulario avanzado tipo "Modal" con carga de imagen (PC/URL) y TinyMCE (Editor tipo Word) configurado con estilo "Hoja A4" para redactar noticias profesionales.
+
+Almacenamiento: Utiliza la clave de LocalStorage 'noticias-tupahue'.
+
+5. Front-End y Vista Pública (Landing Page)
+La web pública consume los datos del CMS en tiempo real mediante arquitectura de componentes modulares:
+
+Navbar: Ruteo actualizado con la pestaña "Noticias" accesible y estructurada de forma responsiva.
+
+Hero Section (Estilo E-Commerce): Rediseño de la portada aplicando el principio de responsabilidad única:
+
+HeroHome.jsx: Contenedor principal.
+
+HeroSlider.jsx: Fondo dinámico con temporizador automático (setInterval) para rotar imágenes de campamentos.
+
+FloatingNews.jsx: Carrusel de previsualización que lee el LocalStorage, filtra las últimas noticias "Publicadas" y las renderiza como tarjetas flotantes superpuestas al banner.
+
+Página de Noticias General (NoticiasPage.jsx): Grilla completa con todas las novedades publicadas y enlaces de redirección.
+
+Lectura de Noticias (NoticiaDetallePage.jsx): Ruta dinámica (/noticias/:id) que lee la base de datos, extrae la noticia específica y utiliza dangerouslySetInnerHTML para renderizar el código HTML enriquecido generado por TinyMCE, manteniendo todo el formato visual creado por Comunicaciones.
+
+6. Instrucciones para Continuar
+Estado Actual: El CMS de noticias está 100% funcional, conectado a la Landing Page, con ruteo dinámico y diseño de portada modular finalizado.
+
+Objetivo Inmediato: Definir el próximo paso lógico. Las opciones sugeridas son:
+
+Continuar maquetando las secciones restantes del Home Público (Ej: Sección "Ramas" o "Historia" debajo del Hero).
+
+Regresar al Panel de Control para desarrollar el próximo módulo administrativo (Ej: Gestión de Nóminas o Calendario de Eventos).
+
+Nota para el Asistente: Siempre entregar códigos completos basados en los archivos del usuario, ir paso a paso (dividiendo componentes si es necesario para mantener código limpio), respetar la semántica de React 19 y la estética profesional del Grupo Scout Tupahue. Nunca alterar diseños previos sin consultar.

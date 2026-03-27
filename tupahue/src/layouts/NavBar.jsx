@@ -7,184 +7,249 @@ import {
   Box,
   Container,
   IconButton,
-  Divider
+  Divider,
+  Menu,
+  MenuItem,
+  Fade,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Collapse,
+  Stack
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import LoginIcon from '@mui/icons-material/Login'; // Icono para el login
-import { NavLink } from 'react-router-dom';
+import LoginIcon from '@mui/icons-material/Login';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { CintasPanuelo } from '../components/CintasPanuelos';
 import logoTupahue from '../assets/images/logo.png';
 
 const VIOLETA_SCOUT = '#5A189A';
 
 export const Navbar = () => {
+  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [openMobileRamas, setOpenMobileRamas] = useState(false);
+
+  const openRamas = Boolean(anchorEl);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+  const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
+  const handleOpenRamas = (event) => setAnchorEl(event.currentTarget);
+  const handleCloseRamas = () => setAnchorEl(null);
+
+  const handleBranchNavigate = (path) => {
+    navigate(path);
+    handleCloseRamas();
+    setMobileOpen(false);
   };
 
-  // Ítems de navegación actualizados
-  const navItems = [
+  // 👇 1. Lista antes de Ramas
+  const menuPrincipal = [
     { label: 'Inicio', path: '/' },
-    { label: 'Historia', path: '/historia' },
+    { label: 'Noticias', path: '/noticias' },
     { label: '¿Qué hacemos?', path: '/que-hacemos' },
-    { label: 'Ramas', path: '/ramas' },
+    { label: 'Historia', path: '/historia' },
+  ];
+
+  // 👇 2. Lista después de Ramas
+  const menuSecundario = [
     { label: 'Contacto', path: '/contacto' },
   ];
 
-  const socialLinks = [
-    { icon: <InstagramIcon />, url: 'https://www.instagram.com/grupotupahue/?hl=es', color: '#E1306C' },
-    { icon: <FacebookIcon />, url: 'https://www.facebook.com/grupotupahue/?locale=es_LA', color: '#4267B2' },
-    { icon: <WhatsAppIcon />, url: 'https://chat.whatsapp.com/CLwLHvggsVZ9fwqSjnnCSv', color: '#25D366' },
+  const branches = [
+    { label: 'Ver todas', path: '/ramas' },
+    { label: 'Lobatos', path: '/ramas/lobatos' },
+    { label: 'Scouts', path: '/ramas/scouts' },
+    { label: 'Caminantes', path: '/ramas/caminantes' },
+    { label: 'Rovers', path: '/ramas/rovers' },
   ];
 
+  // MENU MÓVIL (DRAWER)
+  const drawer = (
+    <Box sx={{ width: 280, pt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, color: VIOLETA_SCOUT }}>MENÚ</Typography>
+        <IconButton onClick={handleDrawerToggle}><CloseIcon /></IconButton>
+      </Box>
+      <Divider />
+
+      <List>
+        {/* Enlaces Principales */}
+        {menuPrincipal.map((item) => (
+          <ListItem key={item.label} disablePadding>
+            <ListItemButton component={NavLink} to={item.path} onClick={handleDrawerToggle}>
+              <ListItemText primary={item.label} sx={{ '& span': { fontWeight: 600 } }} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+
+        {/* Acordeón de Ramas */}
+        <ListItemButton onClick={() => setOpenMobileRamas(!openMobileRamas)}>
+          <ListItemText primary="Ramas" sx={{ '& span': { fontWeight: 600 } }} />
+          {openMobileRamas ? <ExpandLess /> : <ExpandMore />}
+        </ListItemButton>
+        <Collapse in={openMobileRamas} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+            {branches.map((branch) => (
+              <ListItemButton key={branch.label} sx={{ pl: 4 }} onClick={() => handleBranchNavigate(branch.path)}>
+                <ListItemText primary={branch.label} />
+              </ListItemButton>
+            ))}
+          </List>
+        </Collapse>
+
+        {/* Enlaces Secundarios (Contacto) */}
+        {menuSecundario.map((item) => (
+          <ListItem key={item.label} disablePadding>
+            <ListItemButton component={NavLink} to={item.path} onClick={handleDrawerToggle}>
+              <ListItemText primary={item.label} sx={{ '& span': { fontWeight: 600 } }} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      <Divider sx={{ my: 2 }} />
+
+      {/* Botón Ingresar */}
+      <Box sx={{ px: 2, mb: 2 }}>
+        <Button
+          fullWidth variant="contained"
+          startIcon={<LoginIcon />}
+          onClick={() => handleBranchNavigate('/login')}
+          sx={{ bgcolor: VIOLETA_SCOUT, fontWeight: 'bold' }}
+        >
+          Ingresar
+        </Button>
+      </Box>
+
+      {/* Redes Sociales */}
+      <Box sx={{ px: 2, display: 'flex', justifyContent: 'center', gap: 2, mb: 3 }}>
+        <IconButton component="a" href="https://www.instagram.com/grupotupahue/" target="_blank" rel="noopener noreferrer" sx={{ color: '#E1306C' }}>
+          <InstagramIcon />
+        </IconButton>
+        <IconButton component="a" href="https://www.facebook.com/grupotupahue/" target="_blank" rel="noopener noreferrer" sx={{ color: '#4267B2' }}>
+          <FacebookIcon />
+        </IconButton>
+        <IconButton component="a" href="https://chat.whatsapp.com/CLwLHvggsVZ9fwqSjnnCSv" target="_blank" rel="noopener noreferrer" sx={{ color: '#25D366' }}>
+          <WhatsAppIcon />
+        </IconButton>
+      </Box>      
+    </Box>
+  );
+
+  // MENU ESCRITORIO
   return (
     <>
       <AppBar
         position="fixed"
         sx={{
-          bgcolor: isScrolled ? 'rgba(255, 255, 255, 0.2)' : 'white', 
-          backdropFilter: isScrolled ? 'blur(15px)' : 'none',
-          WebkitBackdropFilter: isScrolled ? 'blur(15px)' : 'none',
+          bgcolor: isScrolled ? 'rgba(255, 255, 255, 0.95)' : 'white',
+          backdropFilter: isScrolled ? 'blur(10px)' : 'none',
           color: '#333',
           transition: 'all 0.5s ease',
-          boxShadow: isScrolled ? 'none' : '0 2px 10px rgba(0,0,0,0.1)',
+          boxShadow: isScrolled ? '0 2px 10px rgba(0,0,0,0.1)' : 'none',
         }}
         elevation={0}
       >
         <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 } }}>
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-            
-            {/* LOGO + TEXTO */}
-            <Box
-              component={NavLink}
-              to="/"
-              sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', gap: 1.5 }}
-            >
-              <Box
-                component="img"
-                src={logoTupahue}
-                alt="Logo Tupahue"
-                sx={{
-                  height: { xs: 50, md: 70 },
-                  width: 'auto',
-                  transition: '0.3s'
-                }}
-              />
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: 'Ubuntu',
-                  fontWeight: 700,
-                  color: VIOLETA_SCOUT,
-                  fontSize: { xs: '1.3rem', md: '1.7rem' },
-                }}
-              >
+
+            {/* LOGO */}
+            <Box component={NavLink} to="/" sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', gap: 1.5 }}>
+              <Box component="img" src={logoTupahue} alt="Logo" sx={{ height: { xs: 45, md: 70 } }} />
+              <Typography variant="h6" sx={{ fontFamily: 'Ubuntu', fontWeight: 700, color: VIOLETA_SCOUT, fontSize: { xs: '1.1rem', md: '1.7rem' } }}>
                 TUPAHUE
               </Typography>
             </Box>
 
-            {/* MENÚ DESKTOP */}
-            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center' }}>
-              {navItems.map((item) => (
-                <Button
-                  key={item.label}
-                  component={NavLink}
-                  to={item.path}
-                  sx={{
-                    mx: 1,
-                    color: '#333',
-                    textTransform: 'none',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    transition: '0.2s',
-                    '&:hover': { color: VIOLETA_SCOUT },
-                    '&.active': {
-                      color: VIOLETA_SCOUT,
-                      borderBottom: `3px solid ${VIOLETA_SCOUT}`,
-                      mb: '-3px',
-                    }
-                  }}
-                >
+            {/* ENLACES ESCRITORIO */}
+            <Box sx={{ display: { xs: 'none', lg: 'flex' }, alignItems: 'center' }}>
+
+              {/* 1. Inicio, Noticias, Que Hacemos, Historia */}
+              {menuPrincipal.map((item) => (
+                <Button key={item.label} component={NavLink} to={item.path} sx={{ mx: 0.5, color: '#333', textTransform: 'none', fontWeight: 600, fontSize: '1rem' }}>
                   {item.label}
                 </Button>
               ))}
 
-              <Divider orientation="vertical" flexItem sx={{ mx: 2, my: 1.5, bgcolor: '#ddd' }} />
+              {/* 2. Ramas (Dropdown) */}
+              <Button onClick={handleOpenRamas} endIcon={<KeyboardArrowDownIcon />} sx={{ mx: 0.5, color: '#333', textTransform: 'none', fontWeight: 600, fontSize: '1rem' }}>
+                Ramas
+              </Button>
+              <Menu anchorEl={anchorEl} open={openRamas} onClose={handleCloseRamas} TransitionComponent={Fade} disableScrollLock sx={{ mt: 1 }}>
+                {branches.map((b) => (
+                  <MenuItem key={b.label} onClick={() => handleBranchNavigate(b.path)} sx={{ fontWeight: 500 }}>{b.label}</MenuItem>
+                ))}
+              </Menu>
 
-              {/* BOTÓN LOGIN */}
-              <Button
-                component={NavLink}
-                to="/login"
-                variant="outlined"
-                startIcon={<LoginIcon />}
-                sx={{
-                  mr: 2,
-                  borderRadius: 2,
-                  borderColor: VIOLETA_SCOUT,
-                  color: VIOLETA_SCOUT,
-                  fontWeight: 'bold',
-                  '&:hover': {
-                    bgcolor: VIOLETA_SCOUT,
-                    color: 'white',
-                    borderColor: VIOLETA_SCOUT
-                  },
-                  '&.active': {
-                    bgcolor: VIOLETA_SCOUT,
-                    color: 'white'
-                  }
-                }}
-              >
+              {/* 3. Contacto */}
+              {menuSecundario.map((item) => (
+                <Button key={item.label} component={NavLink} to={item.path} sx={{ mx: 0.5, color: '#333', textTransform: 'none', fontWeight: 600, fontSize: '1rem' }}>
+                  {item.label}
+                </Button>
+              ))}
+
+              <Divider orientation="vertical" flexItem sx={{ mx: 2, my: 1.5 }} />
+
+              {/* 4. Botón Ingresar */}
+              <Button component={NavLink} to="/login" variant="outlined" startIcon={<LoginIcon />} sx={{ borderRadius: 2, borderColor: VIOLETA_SCOUT, color: VIOLETA_SCOUT, fontWeight: 'bold', px: 3, mr: 2 }}>
                 Ingresar
               </Button>
 
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
-                {socialLinks.map((social, index) => (
-                  <IconButton
-                    key={index}
-                    component="a"
-                    href={social.url}
-                    target="_blank"
-                    sx={{
-                      color: '#666',
-                      '&:hover': { color: social.color, transform: 'scale(1.1)' },
-                      transition: '0.3s'
-                    }}
-                  >
-                    {social.icon}
-                  </IconButton>
-                ))}
-              </Box>
+              {/* 5. Redes Sociales */}
+              <Stack direction="row" spacing={0.5}>
+                <IconButton component="a" href="https://www.instagram.com/grupotupahue/" target="_blank" rel="noopener noreferrer" size="small" sx={{ color: '#E1306C' }}>
+                  <InstagramIcon />
+                </IconButton>
+                <IconButton component="a" href="https://www.facebook.com/grupotupahue/" target="_blank" rel="noopener noreferrer" size="small" sx={{ color: '#4267B2' }}>
+                  <FacebookIcon />
+                </IconButton>
+                <IconButton component="a" href="https://chat.whatsapp.com/CLwLHvggsVZ9fwqSjnnCSv" target="_blank" rel="noopener noreferrer" size="small" sx={{ color: '#25D366' }}>
+                  <WhatsAppIcon />
+                </IconButton>
+              </Stack>
+
             </Box>
 
-            <IconButton
-              onClick={handleDrawerToggle}
-              sx={{ display: { md: 'none' }, color: VIOLETA_SCOUT }}
-            >
+            {/* BOTÓN HAMBURGUESA (MÓVIL) */}
+            <IconButton onClick={handleDrawerToggle} sx={{ display: { lg: 'none' }, color: VIOLETA_SCOUT }}>
               <MenuIcon fontSize="large" />
             </IconButton>
           </Toolbar>
         </Container>
-
-        <Box sx={{ width: '100%' }}>
-          <CintasPanuelo />
-        </Box>
+        <Box sx={{ width: '100%' }}><CintasPanuelo /></Box>
       </AppBar>
 
-      {/* Aquí iría tu Drawer para móvil, recordá agregar el link a /login y /que-hacemos allí también si lo usás */}
+      {/* DRAWER MÓVIL */}
+      <Drawer
+        variant="temporary"
+        anchor="right"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', lg: 'none' },
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
+        }}
+      >
+        {drawer}
+      </Drawer>
     </>
   );
 };

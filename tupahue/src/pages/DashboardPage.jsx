@@ -1,26 +1,26 @@
 import { Box, CssBaseline, Toolbar } from '@mui/material';
 import { ROLES, FUNCIONES } from '../constants/auth.jsx';
-// Importamos la CARPETA del Sidebar (React buscará el index.js o Sidebar.jsx allí)
 import { Sidebar } from '../components/Sidebar/Sidebar'; 
 import { DashboardModals } from '../components/DashboardModals'; 
 import { EducadorMainView } from '../views/educador';
 import { useDashboard } from '../hooks/useDashboard';
-// NUEVO: Importamos useLocalStorage para que el rol sobreviva al F5
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
+// Mantenemos tu usuario de prueba para desarrollo
 const USER_TEST = { nombre: "Arturo", rol: ROLES.EDUCADOR, funcion: FUNCIONES.JEFE_GRUPO };
 
 export const DashboardPage = () => {  
   // 1. Estado para el switch de roles (Persistente con LocalStorage)
   const [funcionSimulada, setFuncionSimulada] = useLocalStorage('tupahue_funcion_simulada', USER_TEST.funcion);
 
-  // 2. IMPORTANTE: Pasamos funcionSimulada al hook para que los permisos sean reactivos
+  // 2. Hook con lógica reactiva según la función simulada
   const state = useDashboard(USER_TEST, [], [], funcionSimulada);
 
   return (
     <Box sx={{ display: 'flex', bgcolor: '#f8f9fa', minHeight: '100vh' }}>
       <CssBaseline />
       
+      {/* SIDEBAR: Maneja la navegación y el cambio de funciones */}
       <Sidebar 
         ramaSeleccionada={state.ramaActiva} 
         onRamaChange={state.setRamaActiva} 
@@ -36,20 +36,21 @@ export const DashboardPage = () => {
         sx={{ 
           flexGrow: 1, 
           p: { xs: 2, sm: 4 }, 
-          // El ancho se ajusta automáticamente
+          // Ajuste dinámico de ancho según sidebar
           width: { sm: `calc(100% - 280px)` }, 
           mt: { xs: 8, sm: 0 },
           transition: 'width 0.3s'
         }}
       >
+        {/* Toolbar para compensar el AppBar en mobile si existiera */}
         <Toolbar sx={{ display: { xs: 'block', sm: 'none' } }} />
         
-        {/* Renderizado de la vista principal */}
+        {/* Renderizado de la vista principal del Educador */}
         {USER_TEST.rol === ROLES.EDUCADOR && (
           <EducadorMainView 
             vistaActual={state.vistaActual}
-            setVistaActual={state.setVistaActual} /* <--- AGREGADO AQUÍ */
-            setRamaActiva={state.setRamaActiva} /* <--- AGREGADO AHORA */
+            setVistaActual={state.setVistaActual}
+            setRamaActiva={state.setRamaActiva}
             ramaActiva={state.ramaActiva}
             scouts={state.scouts}
             eventos={state.eventos}
@@ -58,7 +59,7 @@ export const DashboardPage = () => {
           />
         )}
         
-        {/* Modales de Carga/Edición */}
+        {/* Modales globales de la plataforma */}
         <DashboardModals state={state} handleSaveScout={state.handleSaveScout} />
       </Box>
     </Box>

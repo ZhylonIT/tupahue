@@ -80,101 +80,117 @@ export const QueHacemosPage = () => {
           </Typography>
         </Box>
 
-        {/* SECCIÓN: QUÉ Y CÓMO */}
+        {/* SECCIÓN: QUÉ Y CÓMO (MIGRADO A CSS GRID ESTRICTO) */}
         <Box sx={{ mb: 12 }}>
-          <Grid container spacing={4} alignItems="stretch">
-            <Grid item xs={12} md={6}>
-              <Paper 
-                elevation={0} 
-                sx={{ 
-                  p: 5, height: '100%', bgcolor: '#f8f9fa', borderRadius: 8,
-                  border: '1px solid #eee'
-                }}
-              >
-                <Typography variant="h4" sx={{ fontWeight: 800, mb: 3, color: VIOLETA_SCOUT }}>¿Qué hacemos?</Typography>
-                <Typography variant="body1" sx={{ fontSize: '1.1rem', color: 'text.secondary', lineHeight: 1.8 }}>
-                  Acompañamos a niños, niñas y jóvenes en su proceso de crecimiento integral. Somos un espacio donde cada integrante descubre su potencial, construye su identidad y aprende a ser un ciudadano activo que trabaja por un mundo mejor.
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper 
-                elevation={0} 
-                sx={{ 
-                  p: 5, height: '100%', bgcolor: 'rgba(90, 24, 154, 0.04)', borderRadius: 8,
-                  border: `1px solid ${VIOLETA_SCOUT}20`
-                }}
-              >
-                <Typography variant="h4" sx={{ fontWeight: 800, mb: 3, color: VIOLETA_SCOUT }}>¿Cómo lo hacemos?</Typography>
-                <Typography variant="body1" sx={{ fontSize: '1.1rem', color: 'text.secondary', lineHeight: 1.8 }}>
-                  Aplicamos el metodo Scout, adaptando actividades según la edad mediante el juego, la vida al aire libre y el servicio. Utilizamos objetivos educativos claros en un entorno seguro y acompañados por adultos responsables.
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
+              gap: 4 
+            }}
+          >
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                display: 'flex', flexDirection: 'column', p: 5, bgcolor: '#f8f9fa', borderRadius: 8,
+                border: '1px solid #eee', transition: '0.3s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 4 }
+              }}
+            >
+              <Typography variant="h4" sx={{ fontWeight: 800, mb: 3, color: VIOLETA_SCOUT }}>¿Qué hacemos?</Typography>
+              <Typography variant="body1" sx={{ fontSize: '1.1rem', color: 'text.secondary', lineHeight: 1.8, flexGrow: 1 }}>
+                Acompañamos a niños, niñas y jóvenes en su proceso de crecimiento integral. Somos un espacio donde cada integrante descubre su potencial, construye su identidad y aprende a ser un ciudadano activo que trabaja por un mundo mejor.
+              </Typography>
+            </Paper>
+
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                display: 'flex', flexDirection: 'column', p: 5, bgcolor: 'rgba(90, 24, 154, 0.04)', borderRadius: 8,
+                border: `1px solid ${VIOLETA_SCOUT}20`, transition: '0.3s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 4 }
+              }}
+            >
+              <Typography variant="h4" sx={{ fontWeight: 800, mb: 3, color: VIOLETA_SCOUT }}>¿Cómo lo hacemos?</Typography>
+              <Typography variant="body1" sx={{ fontSize: '1.1rem', color: 'text.secondary', lineHeight: 1.8, flexGrow: 1 }}>
+                Aplicamos el metodo Scout, adaptando actividades según la edad mediante el juego, la vida al aire libre y el servicio. Utilizamos objetivos educativos claros en un entorno seguro y acompañados por adultos responsables.
+              </Typography>
+            </Paper>
+          </Box>
         </Box>
 
-        {/* FUNDAMENTOS (Relaciones) */}
+        {/* FUNDAMENTOS (MIGRADO A CSS GRID ESTRICTO) */}
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography variant="h3" sx={{ color: VIOLETA_SCOUT, fontWeight: 900 }}>Pilares de nuestra acción</Typography>
         </Box>
-        <Grid container spacing={4} sx={{ mb: 15 }} justifyContent="center">
+        <Box 
+          sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, 
+            gap: 4, mb: 15 
+          }}
+        >
           {[
             { t: 'Relación con uno mismo', d: 'Construcción de la identidad y toma de decisiones libre.', i: <PersonIcon fontSize="large" /> },
             { t: 'Relación con el Mundo', d: 'Solidaridad, democracia y respeto por el ambiente.', i: <LanguageIcon fontSize="large" /> },
             { t: 'Relación con Dios', d: 'Búsqueda de la trascendencia y fidelidad a la propia fe.', i: <AutoAwesomeIcon fontSize="large" /> }
           ].map((item, idx) => (
-            <Grid item xs={12} sm={6} md={4} key={idx} sx={{ display: 'flex', justifyContent: 'center' }}>
-              <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 5, border: '1px solid #eee', width: '100%', maxWidth: { sm: '400px', md: 'none' }, display: 'flex', flexDirection: 'column', alignItems: 'center' }} elevation={0}>
-                <Box sx={{ color: VIOLETA_SCOUT, mb: 2 }}>{item.i}</Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>{item.t}</Typography>
-                <Typography variant="body2" color="text.secondary">{item.d}</Typography>
-              </Paper>
-            </Grid>
+            <Paper key={idx} sx={{ p: 4, textAlign: 'center', borderRadius: 5, border: '1px solid #eee', display: 'flex', flexDirection: 'column', alignItems: 'center', transition: '0.3s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 4 } }} elevation={0}>
+              <Box sx={{ color: VIOLETA_SCOUT, mb: 2 }}>{item.i}</Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>{item.t}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>{item.d}</Typography>
+            </Paper>
           ))}
-        </Grid>
+        </Box>
 
-        {/* NUEVAS ÁREAS DE DESARROLLO (4 TARJETAS) */}
-        <Typography variant="h3" textAlign="center" sx={{ color: VIOLETA_SCOUT, fontWeight: 900 }}>Áreas de Desarrollo</Typography>
-        <Grid container spacing={4} sx={{ mb: 15 }} justifyContent="center">
+        {/* NUEVAS ÁREAS DE DESARROLLO (MIGRADO A CSS GRID ESTRICTO) */}
+        <Typography variant="h3" textAlign="center" sx={{ color: VIOLETA_SCOUT, fontWeight: 900, mb: 6 }}>Áreas de Desarrollo</Typography>
+        <Box 
+          sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
+            gap: 4, mb: 15 
+          }}
+        >
           {AREAS_DESARROLLO_NUEVAS.map((area, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index} sx={{ display: 'flex', justifyContent: 'center' }}>
-              <Paper 
-                elevation={0} 
-                sx={{ 
-                  p: 4, height: '100%', width: '100%', borderRadius: 6, border: '1px solid #eee', position: 'relative', transition: 'all 0.3s ease',
-                  '&:hover': { transform: 'translateY(-5px)', borderColor: VIOLETA_SCOUT, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
-                  '&::before': { content: '""', position: 'absolute', left: 0, top: '25%', bottom: '25%', width: '4px', bgcolor: VIOLETA_SCOUT, borderRadius: '0 4px 4px 0' }
-                }}
-              >
-                <Stack spacing={2}>
-                  <Box sx={{ bgcolor: 'rgba(90, 24, 154, 0.05)', p: 1.5, borderRadius: 3, width: 'fit-content' }}>{area.icon}</Box>
-                  <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{area.titulo}</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>{area.desc}</Typography>
-                </Stack>
-              </Paper>
-            </Grid>
+            <Paper 
+              key={index}
+              elevation={0} 
+              sx={{ 
+                display: 'flex', flexDirection: 'column', p: 4, borderRadius: 6, border: '1px solid #eee', position: 'relative', transition: 'all 0.3s ease',
+                '&:hover': { transform: 'translateY(-5px)', borderColor: VIOLETA_SCOUT, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
+                '&::before': { content: '""', position: 'absolute', left: 0, top: '25%', bottom: '25%', width: '4px', bgcolor: VIOLETA_SCOUT, borderRadius: '0 4px 4px 0' }
+              }}
+            >
+              <Stack spacing={2} sx={{ flexGrow: 1 }}>
+                <Box sx={{ bgcolor: 'rgba(90, 24, 154, 0.05)', p: 1.5, borderRadius: 3, width: 'fit-content' }}>{area.icon}</Box>
+                <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{area.titulo}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>{area.desc}</Typography>
+              </Stack>
+            </Paper>
           ))}
-        </Grid>
+        </Box>
 
-        {/* EL MÉTODO SCOUT (8 PUNTOS) */}
+        {/* EL MÉTODO SCOUT (MIGRADO A CSS GRID ESTRICTO) */}
         <Box sx={{ bgcolor: 'rgba(90, 24, 154, 0.03)', p: {xs: 4, md: 8}, borderRadius: 8 }}>
           <Typography variant="h3" textAlign="center" sx={{ color: VIOLETA_SCOUT, fontWeight: 800, mb: 8 }}>El Método Scout</Typography>
-          <Grid container spacing={4} justifyContent="center">
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
+              columnGap: 6, rowGap: 4 
+            }}
+          >
             {ELEMENTOS_METODO.map((metodo, idx) => (
-              <Grid item xs={12} sm={6} key={idx}>
-                <Stack direction="row" spacing={3} alignItems="flex-start">
-                  <Typography variant="h3" sx={{ color: VIOLETA_SCOUT, fontWeight: 900, opacity: 0.2, lineHeight: 1 }}>
-                    {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
-                  </Typography>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>{metodo.t}</Typography>
-                    <Typography variant="body1" color="text.secondary">{metodo.d}</Typography>
-                  </Box>
-                </Stack>
-              </Grid>
+              <Stack key={idx} direction="row" spacing={3} alignItems="flex-start" sx={{ transition: '0.3s', '&:hover': { transform: 'translateX(5px)' } }}>
+                <Typography variant="h3" sx={{ color: VIOLETA_SCOUT, fontWeight: 900, opacity: 0.2, lineHeight: 1 }}>
+                  {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                </Typography>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>{metodo.t}</Typography>
+                  <Typography variant="body1" color="text.secondary">{metodo.d}</Typography>
+                </Box>
+              </Stack>
             ))}
-          </Grid>
+          </Box>
         </Box>
       </Container>
     </Box>

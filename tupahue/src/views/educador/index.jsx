@@ -3,15 +3,15 @@ import { NominaView } from './nomina/NominaView';
 import { ProgresionView } from './progresion/ProgresionView';
 import { CalendarioView } from './calendario/CalendarioView';
 import { DocumentosView } from './documentos/DocumentosView';
-// --- ÚNICA ADICIÓN DE IMPORT ---
 import { PlanificacionesView } from './planificaciones/PlanificacionesView'; 
-import { Box, Typography } from '@mui/material';
-import { InfoOutlined } from '@mui/icons-material';
+// Importación de la nueva vista de Noticias
+import { NoticiasView } from './noticias/NoticiasView'; 
+import { Box } from '@mui/material';
 
 export const EducadorMainView = ({ 
   vistaActual, 
   setVistaActual, 
-  setRamaActiva, // <-- PASO 2: Recibimos la función acá
+  setRamaActiva, 
   ramaActiva, 
   scouts, 
   eventos, 
@@ -19,18 +19,19 @@ export const EducadorMainView = ({
   userFuncion 
 }) => {
   
-  // Lógica de filtrado (MANTENIDA EXACTA)
-  const scoutsFiltrados = scouts.filter(s => {
+  // Lógica de filtrado por rama (se mantiene para las vistas que lo requieren)
+  const scoutsFiltrados = scouts?.filter(s => {
     if (ramaActiva === 'TODAS') return true;
     const ramaScout = s.rama || ""; 
     return ramaScout.toUpperCase() === (ramaActiva?.toUpperCase() || "");
-  });
+  }) || [];
 
   const commonProps = { 
     ramaId: ramaActiva,
     userFuncion: userFuncion 
   };
 
+  // El switch decide qué componente renderizar en el área principal del Dashboard
   switch (vistaActual) {
     case 'DASHBOARD': 
       return (
@@ -56,18 +57,16 @@ export const EducadorMainView = ({
       );
 
     case 'PROGRESION':       
-      // ¡ELIMINAMOS EL BLOQUEO AQUÍ! Ahora ProgresionView maneja la vista global sola.
       return (
         <ProgresionView 
           scouts={scoutsFiltrados} 
-          setRamaActiva={setRamaActiva} // <-- PASO 2: Se la pasamos a la vista
+          setRamaActiva={setRamaActiva} 
           {...commonProps} 
           onUpdateEtapa={handlers.handleUpdateEtapa} 
           onPaseDeRama={handlers.handlePaseDeRama} 
         />
       );
 
-    // --- ÚNICA ADICIÓN DE CASE ---
     case 'PLANIFICACIONES':
       return <PlanificacionesView ramaId={ramaActiva} {...commonProps} />;
 
@@ -84,6 +83,11 @@ export const EducadorMainView = ({
     case 'DOCUMENTOS': 
       return <DocumentosView scouts={scoutsFiltrados} {...commonProps} />;
 
+    // --- VISTA DE PRENSA Y NOTICIAS ---
+    case 'NOTICIAS':
+      return <NoticiasView {...commonProps} />;
+
+    // Caso por defecto: vuelve al Dashboard inicial
     default: 
       return (
         <DashboardView 
