@@ -10,9 +10,10 @@ import { RamaRovers } from './pages/RamaRovers';
 import { ContactoPage } from './pages/ContactoPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+// 👇 Importamos la página independiente para Familias
+import { FamiliaDashboardPage } from './pages/FamiliaDashboardPage'; 
 import { QueHacemosPage } from './pages/QueHacemosPage'; 
 import { NoticiasPage } from './pages/NoticiasPage'; 
-// 👇 Importamos la página de detalle
 import { NoticiaDetallePage } from './pages/NoticiaDetallePage'; 
 import { CssBaseline, Box, createTheme, ThemeProvider, CircularProgress } from '@mui/material';
 import { Footer } from './components/footer';
@@ -30,7 +31,7 @@ const theme = createTheme({
 const ProtectedRoute = ({ children }) => {
   const { user, authLoading } = useAuth();
   
-  // 🛠️ MODO DESARROLLADOR: 
+  // 🛠️ MODO DESARROLLADOR: Mantenlo en true para probar libremente
   const isDevMode = true; 
 
   if (isDevMode) return children;
@@ -51,7 +52,7 @@ const ProtectedRoute = ({ children }) => {
 const LayoutManager = () => {
   const location = useLocation();
   
-  // Detectamos si estamos en cualquier ruta de dashboard
+  // Detectamos si estamos en cualquier ruta de dashboard para ocultar Navbar/Footer
   const isDashboard = location.pathname.includes('/dashboard');
 
   return (
@@ -76,15 +77,21 @@ const LayoutManager = () => {
           <Route path="/ramas/caminantes" element={<RamaCaminantes />} />
           <Route path="/ramas/rovers" element={<RamaRovers />} />          
           <Route path="/noticias" element={<NoticiasPage />} />
-          {/* 👇 Ruta dinámica para leer una noticia particular */}
           <Route path="/noticias/:id" element={<NoticiaDetallePage />} />
           <Route path="/contacto" element={<ContactoPage />} />
           <Route path="/login" element={<LoginPage />} />
 
           {/* --- RUTAS PRIVADAS (PROTEGIDAS) --- */}
+          {/* Dashboard General (Educadores por defecto) */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          
+          {/* Dashboard Educador (Tu página con el engranaje y gestión) */}
           <Route path="/dashboard/educador" element={<ProtectedRoute><DashboardPage userRole="educador" /></ProtectedRoute>} />
-          <Route path="/dashboard/familia" element={<ProtectedRoute><DashboardPage userRole="familia" /></ProtectedRoute>} />
+          
+          {/* Dashboard Familia (La nueva página independiente) */}
+          <Route path="/dashboard/familia" element={<ProtectedRoute><FamiliaDashboardPage /></ProtectedRoute>} /> 
+          
+          {/* Dashboard Joven (Protagonistas) */}
           <Route path="/dashboard/joven" element={<ProtectedRoute><DashboardPage userRole="joven" /></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/" />} />
