@@ -1,24 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Grid, Paper, Typography, Box, Stack, 
-  LinearProgress, Card, CardContent, Avatar, Button
+  LinearProgress, Card, CardContent, Avatar, Divider, IconButton, Button, Tooltip
 } from '@mui/material';
 import { 
-  TrendingUp, 
-  Group, 
-  FactCheck, 
-  NotificationImportant,
-  Event as EventIcon,
-  Public,
-  AutoGraph,
-  AdsClick,
-  Assignment
+  TrendingUp, Group, FactCheck, NotificationImportant,
+  Event as EventIcon, Public, AutoGraph, Assignment,
+  AccountBalanceWallet, Payments, School, WorkspacePremium, 
+  WarningAmber, ChevronLeft, ChevronRight, LocationOn
 } from '@mui/icons-material';
 import { RAMAS } from '../../constants/ramas';
 import { FUNCIONES } from '../../constants/auth';
+import { useFinanzas } from '../../hooks/useFinanzas';
+import { useAdultos } from '../../hooks/useAdultos';
 
-const StatCard = ({ title, value, icon, color, subtitle }) => (
-  <Paper sx={{ p: 3, borderRadius: 4, height: '100%', border: '1px solid #eee', boxShadow: 'none' }}>
+const VIOLETA_SCOUT = '#5A189A';
+
+const StatCard = ({ title, value, icon, color, subtitle, onClick }) => (
+  <Paper 
+    onClick={onClick}
+    sx={{ 
+      p: 3, borderRadius: 4, height: '100%', border: '1px solid #eee', boxShadow: 'none',
+      cursor: onClick ? 'pointer' : 'default',
+      transition: '0.2s',
+      '&:hover': onClick ? { transform: 'translateY(-4px)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' } : {}
+    }}
+  >
     <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
       <Box>
         <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700 }}>{title}</Typography>
@@ -33,235 +40,201 @@ const StatCard = ({ title, value, icon, color, subtitle }) => (
 );
 
 export const DashboardView = ({ scouts = [], eventos = [], ramaId = 'CAMINANTES', userFuncion, setVistaActual }) => {
-  const esVistaGlobal = ramaId.toUpperCase() === 'TODAS';
-  const idBusqueda = ramaId.toUpperCase();
+  const { movimientos } = useFinanzas();
+  const { adultos } = useAdultos();
+  
+  // Lógica de Carrusel
+  const [currentEventIdx, setCurrentEventIdx] = useState(0);
+
+  const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS';
+  const idBusqueda = ramaId?.toUpperCase();
   const CONFIG_RAMA = esVistaGlobal 
-    ? { nombre: 'Todo el Grupo', color: '#2c3e50' }
+    ? { nombre: 'Todo el Grupo', color: VIOLETA_SCOUT } 
     : (RAMAS[idBusqueda] || RAMAS.CAMINANTES);
 
-  // Lógica de roles sincronizada con tu auth.jsx
   const esAsistentePrograma = userFuncion === FUNCIONES.ASISTENTE_PROG;
+  const esAdmin = userFuncion === FUNCIONES.JEFE_GRUPO || userFuncion === FUNCIONES.ASISTENTE_ADM;
+  const esAGA = userFuncion === FUNCIONES.ASISTENTE_ADULTOS;
 
-  // Lógica de datos generales
+  // --- CÁLCULOS REALES ADULTOS ---
+  const statsAdultos = useMemo(() => {
+    const total = adultos.length;
+    if (total === 0) return { total: 0, promedio: 0, alertas: 0 };
+    const maxExp = 12; 
+    const completadas = adultos.reduce((acc, a) => acc + (a.formacion?.length || 0), 0);
+    const promedio = Math.min(100, Math.round((completadas / (total * maxExp)) * 100));
+    const alertas = adultos.filter(a => (a.formacion?.length || 0) < 2).length;
+    return { total, promedio, alertas };
+  }, [adultos]);
+
+  // --- CÁLCULOS REALES FINANZAS ---
+  const statsFinancieras = useMemo(() => {
+    const ingresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + Number(m.monto), 0);
+    const egresos = movimientos.filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + Number(m.monto), 0);
+    const mesActual = new Date().toLocaleString('es-AR', { month: 'long' });
+    const nomMes = mesActual.charAt(0).toUpperCase() + mesActual.slice(1);
+    const pagaronCuota = movimientos.filter(m => m.categoria === 'cuota' && m.mesesPagos?.includes(nomMes)).length;
+    return { saldo: ingresos - egresos, pagaronCuota, nomMes };
+  }, [movimientos]);
+
   const totalScouts = scouts.length;
   const conFicha = scouts.filter(s => s.fichaEntregada).length;
   const porcentajeFichas = totalScouts > 0 ? (conFicha / totalScouts) * 100 : 0;
   
-  // Cálculo por ramas
   const conteoPorRama = Object.values(RAMAS).map(r => ({
     ...r,
     cantidad: scouts.filter(s => s.rama?.toUpperCase() === r.id.toUpperCase()).length
   }));
 
-  const proximoEvento = eventos.length > 0 ? eventos[0] : null;
+  // Navegación Carrusel
+  const nextEvent = (e) => { e.stopPropagation(); setCurrentEventIdx((prev) => (prev + 1) % eventos.length); };
+  const prevEvent = (e) => { e.stopPropagation(); setCurrentEventIdx((prev) => (prev - 1 + eventos.length) % eventos.length); };
 
-  // --- NUEVO: Lógica para contar Planificaciones Nuevas (Últimos 7 días) ---
-  const [planisNuevas, setPlanisNuevas] = useState(0);
-
-  useEffect(() => {
-    if (esAsistentePrograma || esVistaGlobal) {
-      const ramas = ['LOBATOS', 'SCOUTS', 'CAMINANTES', 'ROVERS'];
-      let contadorNuevas = 0;
-      
-      const haceUnaSemana = new Date();
-      haceUnaSemana.setDate(haceUnaSemana.getDate() - 7);
-
-      ramas.forEach(rama => {
-        const saved = localStorage.getItem(`tupahue_historial_planificaciones_${rama}`);
-        if (saved) {
-          const historial = JSON.parse(saved);
-          historial.forEach(plani => {
-            if (plani.id > haceUnaSemana.getTime()) {
-              contadorNuevas++;
-            }
-          });
-        }
-      });
-      setPlanisNuevas(contadorNuevas);
-    }
-  }, [esAsistentePrograma, esVistaGlobal]);
+  const proximoEvento = eventos.length > 0 ? eventos[currentEventIdx] : null;
 
   return (
-    <Box>
-      {/* CABECERA DINÁMICA */}
+    <Box sx={{ animation: 'fadeIn 0.5s ease-out' }}>
       <Box sx={{ mb: 4 }}>
         <Stack direction="row" spacing={2} alignItems="center">
-          {esVistaGlobal ? (
-            <Public sx={{ fontSize: 40, color: CONFIG_RAMA.color }} />
-          ) : esAsistentePrograma ? (
-            <AutoGraph sx={{ fontSize: 40, color: CONFIG_RAMA.color }} />
-          ) : (
-             <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: CONFIG_RAMA.color }} />
-          )}
+          {esAGA ? <WorkspacePremium sx={{ fontSize: 40, color: '#c0392b' }} />
+          : esVistaGlobal ? <Public sx={{ fontSize: 40, color: CONFIG_RAMA.color }} /> 
+          : <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: CONFIG_RAMA.color }} />}
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 900 }}>
-              {esAsistentePrograma ? 'Gestión de Programa' : '¡Siempre Listo!'}
+              {esAGA ? 'Gestión de Adultos' : esAdmin ? 'Panel de Gestión' : '¡Siempre Listo!'}
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              {esAsistentePrograma 
-                ? `Seguimiento Educativo • ${CONFIG_RAMA.nombre}` 
-                : esVistaGlobal ? 'Resumen General del Grupo Scout Tupahue' : `Panel de control de la ${CONFIG_RAMA.nombre}`}
+              {esVistaGlobal ? 'Resumen General • Grupo Scout Tupahue' : `Panel de control • ${CONFIG_RAMA.nombre}`}
             </Typography>
           </Box>
         </Stack>
       </Box>
 
       <Grid container spacing={3}>
-        {/* FILA DE CARDS DINÁMICAS */}
+        {/* CARDS DINÁMICAS */}
         <Grid item xs={12} sm={6} md={3}>
           <StatCard 
-            title="Beneficiarios" 
-            value={totalScouts} 
-            icon={<Group />} 
-            color={CONFIG_RAMA.color}
-            subtitle={esVistaGlobal ? "Total Grupo" : "Activos en rama"}
+            title={esAGA ? "Consejo de Grupo" : "Beneficiarios"} 
+            value={esAGA ? statsAdultos.total : totalScouts} 
+            icon={<Group />} color={esAGA ? "#c0392b" : CONFIG_RAMA.color}
+            subtitle={esAGA ? "Educadores en nómina" : "Activos actualmente"} 
+            onClick={() => setVistaActual(esAGA ? 'ADULTOS' : 'NOMINA')}
           />
         </Grid>
 
-        {/* Si es Asistente de Programa o está en la vista Global */}
-        {(esAsistentePrograma || esVistaGlobal) ? (
-          <>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box 
-                onClick={() => setVistaActual && setVistaActual('PLANIFICACIONES')}
-                sx={{ 
-                  cursor: 'pointer', height: '100%', 
-                  transition: '0.2s', '&:hover': { transform: 'scale(1.02)' } 
-                }}
-              >
-                <StatCard 
-                  title="Planificaciones" 
-                  value={planisNuevas} 
-                  icon={planisNuevas > 0 ? <NotificationImportant /> : <Assignment />} 
-                  color={planisNuevas > 0 ? "#1976d2" : "#757575"} 
-                  subtitle={planisNuevas > 0 ? "Nuevas (Clic para revisar)" : "Todas al día"} 
-                />
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Eventos" 
-                value={eventos.length} 
-                icon={<EventIcon />} 
-                color="#ed6c02" 
-                subtitle="Agendados en total" 
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Fichas Médicas" 
-                value={`${conFicha}/${totalScouts}`} 
-                icon={<FactCheck />} 
-                color="#2e7d32" 
-                subtitle={`${porcentajeFichas.toFixed(0)}% entrega global`} 
-              />
-            </Grid>
-          </>
-        ) : (
-          /* Vista normal para el Educador de Rama */
-          <>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard title="Fichas Médicas" value={`${conFicha}/${totalScouts}`} icon={<FactCheck />} color="#2e7d32" subtitle={`${porcentajeFichas.toFixed(0)}% entrega`} />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard title="Asistencia" value={scouts.filter(s => s.presente).length} icon={<TrendingUp />} color="#1976d2" subtitle="Presentes hoy" />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard title="Alertas" value={totalScouts - conFicha} icon={<NotificationImportant />} color="#d32f2f" subtitle="Faltan fichas" />
-            </Grid>
-          </>
-        )}
+        <Grid item xs={12} sm={6} md={3}>
+          {esAdmin ? (
+            <StatCard title="Saldo en Caja" value={`$${statsFinancieras.saldo.toLocaleString()}`} icon={<AccountBalanceWallet />} color="#2e7d32" subtitle="Disponible real" onClick={() => setVistaActual('FINANZAS')} />
+          ) : (
+            <StatCard title={esAGA ? "Formación" : "Asistencia"} value={esAGA ? `${statsAdultos.promedio}%` : scouts.filter(s => s.presente).length} icon={esAGA ? <School /> : <TrendingUp />} color={esAGA ? "#2980b9" : "#1976d2"} subtitle={esAGA ? "Avance SNF" : "Presentes hoy"} onClick={() => setVistaActual(esAGA ? 'ADULTOS' : 'NOMINA')} />
+          )}
+        </Grid>
 
-        {/* BLOQUE CENTRAL: RAMAS O PROGRESIÓN */}
+        <Grid item xs={12} sm={6} md={3}>
+          {esAdmin ? (
+            <StatCard title={`Cuotas ${statsFinancieras.nomMes}`} value={`${statsFinancieras.pagaronCuota}/${totalScouts}`} icon={<Payments />} color={VIOLETA_SCOUT} subtitle="Cobranza del mes" onClick={() => setVistaActual('CUOTAS')} />
+          ) : (
+            <StatCard title={esAGA ? "Alertas SNF" : "Fichas Médicas"} value={esAGA ? statsAdultos.alertas : `${conFicha}/${totalScouts}`} icon={esAGA ? <WarningAmber /> : <FactCheck />} color={esAGA ? "#e67e22" : "#2e7d32"} subtitle={esAGA ? "Nivel inicial s/avances" : "Documentación al día"} onClick={() => setVistaActual(esAGA ? 'ADULTOS' : 'DOCUMENTOS')} />
+          )}
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+            <StatCard title="Eventos Activos" value={eventos.length} icon={<EventIcon />} color="#757575" subtitle="En el calendario" onClick={() => setVistaActual('CALENDARIO')} />
+        </Grid>
+
+        {/* GRÁFICOS REALES */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee', boxShadow: 'none', height: '100%' }}>
+          <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee', boxShadow: 'none' }}>
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 3 }}>
-              {esAsistentePrograma ? 'Próximas Entregas de Insignias' : esVistaGlobal ? 'Distribución por Secciones' : 'Estado de Documentación'}
+              {esAGA ? 'Progresión del Consejo (Real)' : 'Distribución por Ramas'}
             </Typography>
-            
-            {esAsistentePrograma ? (
-              <Stack spacing={2}>
-                {scouts.slice(0, 4).map((scout, index) => (
-                  <Box key={index} sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{scout.nombre}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Meta: {index % 2 === 0 ? 'Etapa Progresión' : 'Especialidad'}
-                      </Typography>
+            <Stack spacing={2.5}>
+              {esAGA ? (
+                ["Inicial", "Básico", "Avanzado"].map((nivel, idx) => {
+                  const cant = adultos.filter(a => {
+                    const p = (a.formacion?.length || 0) / 12;
+                    return idx === 0 ? p < 0.3 : idx === 1 ? p >= 0.3 && p < 0.8 : p >= 0.8;
+                  }).length;
+                  return (
+                    <Box key={nivel}>
+                      <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>Nivel {nivel}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{cant} Educadores</Typography>
+                      </Stack>
+                      <LinearProgress variant="determinate" value={statsAdultos.total > 0 ? (cant / statsAdultos.total) * 100 : 0} sx={{ height: 8, borderRadius: 5, bgcolor: '#eee', '& .MuiLinearProgress-bar': { bgcolor: '#c0392b' } }} />
                     </Box>
-                    <Button size="small" variant="outlined" sx={{ borderRadius: 2 }}>Planificar</Button>
-                  </Box>
-                ))}
-              </Stack>
-            ) : esVistaGlobal ? (
-              <Stack spacing={2.5}>
-                {conteoPorRama.map((r) => (
+                  );
+                })
+              ) : (
+                conteoPorRama.map((r) => (
                   <Box key={r.id}>
                     <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: r.color }} />
-                        {r.nombre}
+                      <Typography variant="body2" component="div" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: r.color }} /> {r.nombre}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{r.cantidad} chicos</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{r.cantidad} beneficiarios</Typography>
                     </Stack>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={totalScouts > 0 ? (r.cantidad / totalScouts) * 100 : 0} 
-                      sx={{ 
-                        height: 8, borderRadius: 5, bgcolor: '#eee',
-                        '& .MuiLinearProgress-bar': { bgcolor: r.color } 
-                      }} 
-                    />
+                    <LinearProgress variant="determinate" value={totalScouts > 0 ? (r.cantidad / totalScouts) * 100 : 0} sx={{ height: 8, borderRadius: 5, bgcolor: '#eee', '& .MuiLinearProgress-bar': { bgcolor: r.color } }} />
                   </Box>
-                ))}
-              </Stack>
-            ) : (
-              <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                  <Typography variant="body2">Fichas Médicas Nacionales</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{conFicha} de {totalScouts}</Typography>
-                </Stack>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={porcentajeFichas} 
-                  sx={{ 
-                    height: 10, borderRadius: 5, bgcolor: '#eee',
-                    '& .MuiLinearProgress-bar': { bgcolor: CONFIG_RAMA.color } 
-                  }} 
-                />
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-                  Es vital que todos los miembros de la <b>{CONFIG_RAMA.nombre}</b> tengan su documentación al día.
-                </Typography>
-              </Box>
-            )}
+                ))
+              )}
+            </Stack>
           </Paper>
         </Grid>
 
-        {/* AGENDA */}
+        {/* CARRUSEL DE AGENDA REAL */}
         <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 4, bgcolor: CONFIG_RAMA.color, color: 'white', height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="overline" sx={{ opacity: 0.8, fontWeight: 700 }}>
-                {esAsistentePrograma ? 'Foco de Programa' : 'Agenda de Grupo'}
-              </Typography>
-              {proximoEvento ? (
-                <Stack spacing={2} sx={{ mt: 2 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 900 }}>{proximoEvento.titulo}</Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <EventIcon fontSize="small" />
-                    <Typography variant="body2">{proximoEvento.fecha}</Typography>
+          <Card 
+            sx={{ 
+              borderRadius: 4, 
+              bgcolor: proximoEvento ? (esAGA ? '#c0392b' : CONFIG_RAMA.color) : '#f5f5f5', 
+              color: proximoEvento ? 'white' : 'text.disabled', 
+              height: '100%',
+              display: 'flex', flexDirection: 'column'
+            }}
+          >
+            <CardContent sx={{ p: 3, flexGrow: 1 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Typography variant="overline" sx={{ opacity: 0.8, fontWeight: 700 }}>
+                  Agenda {eventos.length > 1 && `(${currentEventIdx + 1}/${eventos.length})`}
+                </Typography>
+                {eventos.length > 1 && (
+                  <Stack direction="row" spacing={1}>
+                    <IconButton size="small" onClick={prevEvent} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)' }}><ChevronLeft /></IconButton>
+                    <IconButton size="small" onClick={nextEvent} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)' }}><ChevronRight /></IconButton>
                   </Stack>
-                  <Typography variant="body2" sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1.5, borderRadius: 2 }}>
-                    {esAsistentePrograma 
-                      ? "Prioridad: Revisión de objetivos personales y progresión técnica."
-                      : `Lugar: ${proximoEvento.lugar || 'Sede Grupo'}`}
-                  </Typography>
+                )}
+              </Stack>
+
+              {proximoEvento ? (
+                <Box key={proximoEvento.id} sx={{ animation: 'slideIn 0.3s ease-out' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 900, mb: 2 }}>{proximoEvento.titulo}</Typography>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" spacing={1} alignItems="center"><EventIcon fontSize="small" /><Typography variant="body2">{proximoEvento.fecha}</Typography></Stack>
+                    <Stack direction="row" spacing={1} alignItems="center"><LocationOn fontSize="small" /><Typography variant="body2">{proximoEvento.lugar || 'Sede Grupo'}</Typography></Stack>
+                    <Divider sx={{ bgcolor: 'rgba(255,255,255,0.2)', my: 1 }} />
+                    <Typography variant="body2" sx={{ opacity: 0.9, fontStyle: 'italic' }}>{proximoEvento.descripcion || 'Sin detalles adicionales.'}</Typography>
+                  </Stack>
+                </Box>
+              ) : (
+                <Stack alignItems="center" justifyContent="center" sx={{ mt: 4, textAlign: 'center' }}>
+                  <EventIcon sx={{ fontSize: 40, mb: 1, opacity: 0.3 }} />
+                  <Typography variant="body2">No hay eventos registrados.</Typography>
                 </Stack>
-              ) : <Typography sx={{ mt: 2 }}>No hay actividades programadas.</Typography>}
+              )}
             </CardContent>
+            {proximoEvento && (
+              <Box sx={{ p: 2 }}>
+                <Button fullWidth variant="contained" size="small" onClick={() => setVistaActual('CALENDARIO')} sx={{ bgcolor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)' }}>Ver Todo el Calendario</Button>
+              </Box>
+            )}
           </Card>
         </Grid>
       </Grid>
+      <style>{`
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
     </Box>
   );
 };

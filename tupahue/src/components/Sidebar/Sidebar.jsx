@@ -4,7 +4,9 @@ import {
   Dashboard, People, BarChart, Event as EventIcon, 
   FolderShared, AccountBalanceWallet, Campaign, 
   AdminPanelSettings, Engineering, School,
-  Assignment 
+  Assignment, Payments,
+  AccountBalance,
+  WorkspacePremium // 👈 Importamos el ícono para Gestión de Adultos
 } from '@mui/icons-material';
 import { RAMAS } from '../../constants/ramas.jsx';
 import { FUNCIONES } from '../../constants/auth.jsx';
@@ -33,10 +35,10 @@ const getRoleIcon = (func) => {
 const getCargoLabel = (func) => {
   const nombres = {
     [FUNCIONES.JEFE_GRUPO]: "Jefe de Grupo",
-    [FUNCIONES.ASISTENTE_PROG]: "Asistente de Prog.",
-    [FUNCIONES.ASISTENTE_ADM]: "Asistente de Adm.",
+    [FUNCIONES.ASISTENTE_PROG]: "Asistente de Programa",
+    [FUNCIONES.ASISTENTE_ADM]: "Asistente de Administracion y finanzas",
     [FUNCIONES.ASISTENTE_ADULTOS]: "Asistente de Adultos",
-    [FUNCIONES.ASISTENTE_COM]: "Asistente de Com."
+    [FUNCIONES.ASISTENTE_COM]: "Asistente de Comunicaciones"
   };
   return nombres[func] || `Educador ${RAMAS[func.toUpperCase()]?.nombre || "Rama"}`;
 };
@@ -53,14 +55,14 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
   }, [userFuncion, ramaSeleccionada]);
 
   const menuItems = useMemo(() => {
-    // 1. Items base que todos ven
     const items = [
       { id: 'dashboard', label: 'Inicio', icon: <Dashboard />, vista: 'DASHBOARD' }
     ];
 
     const esJefe = userFuncion === FUNCIONES.JEFE_GRUPO;
+    const esAsistenteAdm = userFuncion === FUNCIONES.ASISTENTE_ADM;
+    const esAsistenteAdultos = userFuncion === FUNCIONES.ASISTENTE_ADULTOS; // 👈 Definimos la constante
 
-    // --- Lógica para Educadores de Rama y Asistente de Programa ---
     const esEducadorDeRama = [
       FUNCIONES.LOBATOS, 
       FUNCIONES.SCOUTS, 
@@ -83,25 +85,37 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
       );
     }
 
-    // --- Lógica para Asistente Administrativo ---
-    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_ADM) {
-      items.push({ id: 'finanzas', label: 'Finanzas', icon: <AccountBalanceWallet />, vista: 'FINANZAS' });
+    // --- Gestión de Adultos ---
+    if (esJefe || esAsistenteAdultos) {
+      items.push({ 
+        id: 'adultos', 
+        label: 'Gestión de Adultos', 
+        icon: <WorkspacePremium />, 
+        vista: 'ADULTOS' 
+      });
     }
 
-    // --- Lógica para Asistente de Comunicaciones ---
+    // --- Módulo Financiero ---
+    if (esJefe || esAsistenteAdm) {
+      items.push(
+        { id: 'finanzas', label: 'Caja del Grupo', icon: <AccountBalanceWallet />, vista: 'FINANZAS' },
+        { id: 'cuotas', label: 'Estado de Cuotas', icon: <Payments />, vista: 'CUOTAS' },        
+        { id: 'presupuesto', label: 'Presupuesto Anual', icon: <AccountBalance />, vista: 'PRESUPUESTO' }
+      );
+    }
+
     if (esJefe || userFuncion === FUNCIONES.ASISTENTE_COM) {
       items.push({ 
         id: 'noticias', 
         label: 'Panel de noticias', 
         icon: <Campaign />, 
-        vista: 'NOTICIAS' // Coincide con el case 'NOTICIAS' en EducadorMainView
+        vista: 'NOTICIAS' 
       });
     }
 
-    // --- Calendario y Documentos ---
     items.push({ id: 'calendario', label: 'Calendario', icon: <EventIcon />, vista: 'CALENDARIO' });
     
-    if (esJefe || esEducadorDeRama || userFuncion === FUNCIONES.ASISTENTE_ADM) {
+    if (esJefe || esEducadorDeRama || esAsistenteAdm) {
       items.push({ id: 'documentos', label: 'Fichas Médicas', icon: <FolderShared />, vista: 'DOCUMENTOS' });
     }
 
