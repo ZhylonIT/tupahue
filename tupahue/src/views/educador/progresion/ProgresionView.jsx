@@ -3,11 +3,11 @@ import {
   ToggleButtonGroup, ToggleButton, TextField, InputAdornment,
   Paper, LinearProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip
 } from '@mui/material';
-import { ViewModule, ViewList, Search, NorthEast, Assessment } from '@mui/icons-material';
+import { ViewModule, ViewList, Search, NorthEast } from '@mui/icons-material';
 
 import { RAMAS } from '../../../constants/ramas';
 import { SENDEROS, AREAS_ROVERS, OBJETIVOS_POR_RAMA } from '../../../constants/progresion'; 
-import { useProgresion } from './UseProgresion'; // IMPORTAMOS EL HOOK
+import { useProgresion } from './UseProgresion'; 
 
 // Sub-componentes locales
 import { ScoutProgressCard } from './ScoutProgressCard';
@@ -25,6 +25,9 @@ export const ProgresionView = ({ scouts, onUpdateEtapa, onPaseDeRama, ramaId = '
     scoutsFiltrados, proximosPases,
     tempEtapa, setTempEtapa,
     tempObjetivos, handleToggleObjetivo,
+    // --- NUEVOS ESTADOS EXTRAÍDOS DEL HOOK ---
+    tempObsInterna, setTempObsInterna,
+    tempObsPadres, setTempObsPadres,
     handleConfirmarCambios, handlePase
   } = useProgresion(scouts, ramaId, onUpdateEtapa, onPaseDeRama);
 
@@ -39,7 +42,6 @@ export const ProgresionView = ({ scouts, onUpdateEtapa, onPaseDeRama, ramaId = '
           {Object.values(RAMAS).map(ramaInfo => {
             const scoutsRama = scouts.filter(s => s.rama?.toUpperCase() === ramaInfo.id);
             return (
-              // Corregido a formato Grid v2
               <Grid size={{ xs: 12, md: 6 }} key={ramaInfo.id}>
                 <Paper 
                   onClick={() => setRamaActiva && setRamaActiva(ramaInfo.id)}
@@ -121,7 +123,7 @@ export const ProgresionView = ({ scouts, onUpdateEtapa, onPaseDeRama, ramaId = '
               key={scout.id} 
               scout={scout} 
               configRama={CONFIG_RAMA} 
-              etapas={CONFIG_RAMA.etapas} // <-- SOLUCIÓN 1
+              etapas={CONFIG_RAMA.etapas} 
               onClick={setScoutSeleccionado} 
             />
           ))}
@@ -137,10 +139,13 @@ export const ProgresionView = ({ scouts, onUpdateEtapa, onPaseDeRama, ramaId = '
       <ProgresionModal 
         open={!!scoutSeleccionado} scout={scoutSeleccionado} onClose={() => setScoutSeleccionado(null)}
         configRama={CONFIG_RAMA} 
-        etapas={CONFIG_RAMA.etapas} // <-- SOLUCIÓN 2
+        etapas={CONFIG_RAMA.etapas} 
         categorias={esRover ? AREAS_ROVERS : SENDEROS}
         objetivosRama={OBJETIVOS_POR_RAMA[idBusqueda] || {}}
         tempEtapa={tempEtapa} setTempEtapa={setTempEtapa} tempObjetivos={tempObjetivos}
+        // --- CONEXIÓN DE NUEVAS PROPS AL MODAL ---
+        tempObsInterna={tempObsInterna} setTempObsInterna={setTempObsInterna}
+        tempObsPadres={tempObsPadres} setTempObsPadres={setTempObsPadres}
         onToggleObjetivo={handleToggleObjetivo} onConfirmar={handleConfirmarCambios} onPase={handlePase}
       />
 

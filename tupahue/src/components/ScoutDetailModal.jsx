@@ -1,6 +1,6 @@
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
-  Button, Grid, Box, Typography, Avatar, Divider, Chip, Stack 
+  Button, Grid, Box, Typography, Avatar, Divider, Chip, Stack, Alert 
 } from '@mui/material';
 import { 
   Person, Badge, Cake, Bloodtype, Group, 
@@ -11,8 +11,12 @@ import { RAMAS } from '../constants/ramas';
 export const ScoutDetailModal = ({ open, onClose, scout, ramaId }) => {
   if (!scout) return null;
 
-  const idBusqueda = ramaId.toUpperCase();
+  const idBusqueda = ramaId ? ramaId.toUpperCase() : 'CAMINANTES';
   const CONFIG_RAMA = RAMAS[idBusqueda] || RAMAS.CAMINANTES;
+
+  // Extraemos los datos médicos reales cargados por la familia
+  const dm = scout.datosMedicos || {};
+  const fichaCompleta = scout.fichaEntregada;
 
   // Función para calcular la edad
   const calcularEdad = (fecha) => {
@@ -44,7 +48,7 @@ export const ScoutDetailModal = ({ open, onClose, scout, ramaId }) => {
               {scout.apellido.toUpperCase()}, {scout.nombre}
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600 }}>
-              {CONFIG_RAMA.nombre} • {scout.equipo || 'Sin Equipo'}
+              {CONFIG_RAMA.nombre} • {scout.equipo || scout.patrulla || 'Sin Equipo'}
             </Typography>
           </Box>
         </Stack>
@@ -59,12 +63,12 @@ export const ScoutDetailModal = ({ open, onClose, scout, ramaId }) => {
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Badge sx={{ color: CONFIG_RAMA.color }} />
-                <Typography variant="body1"><strong>DNI:</strong> {scout.dni}</Typography>
+                <Typography variant="body1"><strong>DNI:</strong> {scout.dni || 'S/D'}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Cake sx={{ color: CONFIG_RAMA.color }} />
                 <Typography variant="body1">
-                  <strong>Nacimiento:</strong> {scout.fechaNacimiento} ({calcularEdad(scout.fechaNacimiento)} años)
+                  <strong>Nacimiento:</strong> {scout.fechaNacimiento || dm.fechaNacimiento || 'S/D'} {scout.fechaNacimiento ? `(${calcularEdad(scout.fechaNacimiento)} años)` : ''}
                 </Typography>
               </Box>
             </Stack>
@@ -72,46 +76,73 @@ export const ScoutDetailModal = ({ open, onClose, scout, ramaId }) => {
 
           <Grid item xs={12}><Divider /></Grid>
 
-          {/* FICHA MÉDICA (Datos que vienen del sistema) */}
+          {/* FICHA MÉDICA CON DATOS REALES */}
           <Grid item xs={12}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
               <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800 }}>Ficha Médica</Typography>
               <Chip 
-                label={scout.fichaEntregada ? "COMPLETA" : "PENDIENTE"} 
-                color={scout.fichaEntregada ? "success" : "error"}
+                label={fichaCompleta ? "COMPLETA" : "PENDIENTE"} 
+                color={fichaCompleta ? "success" : "error"}
                 size="small"
                 variant="filled"
                 sx={{ fontWeight: 800, fontSize: '0.65rem' }}
               />
             </Stack>
 
-            {scout.fichaEntregada ? (
-              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            {fichaCompleta ? (
+              <Grid container spacing={2}>
+                {/* Alertas Críticas Adicionales (Convulsiones, Pánico, CUD) */}
+                {(dm.convulsiones || dm.panico || dm.cud) && (
+                  <Grid item xs={12}>
+                    <Alert severity="warning" sx={{ borderRadius: 2, '& .MuiAlert-message': { width: '100%' } }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>¡ATENCIÓN EDUCADOR!</Typography>
+                      <Typography variant="caption">
+                        {dm.convulsiones && '• Antecedentes de convulsiones. '}
+                        {dm.panico && `• Ataques de pánico/ansiedad (${dm.frecuenciaPanico}). `}
+                        {dm.cud && '• Posee CUD. '}
+                      </Typography>
+                    </Alert>
+                  </Grid>
+                )}
+
                 <Grid item xs={6}>
-                  <Box sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1, height: '100%' }}>
                     <Bloodtype color="error" />
                     <Box>
-                      <Typography variant="caption" display="block" color="text.secondary">Grupo Sanguíneo</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{scout.sangre || 'A+'}</Typography>
+                      <Typography variant="caption" display="block" color="text.secondary" lineHeight={1.2}>Grupo Sanguíneo</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {dm.grupoSanguineo ? `${dm.grupoSanguineo} ${dm.factorRh}` : 'S/D'}
+                      </Typography>
                     </Box>
                   </Box>
                 </Grid>
+                
                 <Grid item xs={6}>
-                  <Box sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <MedicalServices sx={{ color: '#00b894' }} />
+                  <Box sx={{ p: 1.5, bgcolor: dm.alergia ? '#ffebee' : '#f8f9fa', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1, height: '100%' }}>
+                    <MedicalServices sx={{ color: dm.alergia ? '#d32f2f' : '#00b894' }} />
                     <Box>
-                      <Typography variant="caption" display="block" color="text.secondary">Alergias</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>Ninguna</Typography>
+                      <Typography variant="caption" display="block" color={dm.alergia ? 'error' : 'text.secondary'} lineHeight={1.2}>Alergias</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: dm.alergia ? '#d32f2f' : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }} title={dm.cualAlergia}>
+                        {dm.alergia ? dm.cualAlergia : 'Ninguna'}
+                      </Typography>
                     </Box>
                   </Box>
                 </Grid>
+                
                 <Grid item xs={12}>
                   <Box sx={{ p: 1.5, bgcolor: '#fff9db', borderRadius: 2, border: '1px solid #fab005' }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <EscalatorWarning sx={{ color: '#f08c00' }} />
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Phone sx={{ color: '#f08c00' }} />
                       <Box>
-                        <Typography variant="caption" display="block" color="text.secondary">Contacto de Emergencia</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>Madre: 11 1234-5678</Typography>
+                        <Typography variant="caption" display="block" color="text.secondary" lineHeight={1.2}>Contactos de Emergencia</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {dm.telEmergencia1 ? `1) ${dm.telEmergencia1}` : 'Sin datos'}
+                        </Typography>
+                        {dm.telEmergencia2 && (
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            2) {dm.telEmergencia2}
+                          </Typography>
+                        )}
                       </Box>
                     </Stack>
                   </Box>
@@ -121,7 +152,7 @@ export const ScoutDetailModal = ({ open, onClose, scout, ramaId }) => {
               <Box sx={{ p: 3, textAlign: 'center', bgcolor: '#fff5f5', borderRadius: 3, mt: 1 }}>
                 <ErrorOutline color="error" sx={{ fontSize: 40, mb: 1 }} />
                 <Typography variant="body2" color="error" sx={{ fontWeight: 600 }}>
-                  Atención: La familia aún no ha cargado los datos de salud.
+                  Atención: La familia aún no ha completado el legajo digital ni la ficha médica.
                 </Typography>
               </Box>
             )}

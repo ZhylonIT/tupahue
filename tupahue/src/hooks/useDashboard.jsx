@@ -17,8 +17,6 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
     return funcionesGestion.includes(funcionActual);
   }, [funcionActual]);
 
-  // Función auxiliar para deducir a qué rama pertenece un educador basándose en su función
-  // (Ej: Si la función dice "LOBATOS", devuelve "LOBATOS". Ajustá los 'includes' según tus textos reales).
   const deducirRamaDelEducador = (funcion) => {
     if (!funcion) return 'CAMINANTES';
     const funcUpper = funcion.toUpperCase();
@@ -26,11 +24,10 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
     if (funcUpper.includes('SCOUT') || funcUpper.includes('UNIDAD')) return 'SCOUTS';
     if (funcUpper.includes('CAMINANTE')) return 'CAMINANTES';
     if (funcUpper.includes('ROVER') || funcUpper.includes('CLAN')) return 'ROVERS';
-    return 'CAMINANTES'; // Fallback por defecto
+    return 'CAMINANTES'; 
   };
 
   // 2. ESTADOS PERSISTENTES
-  // Leemos lo que hay en localStorage, pero si está vacío, calculamos el default correcto.
   const getInitialRama = () => {
     const saved = localStorage.getItem('tupahue_rama_actual');
     if (saved) return JSON.parse(saved);
@@ -47,21 +44,17 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [scoutSeleccionado, setScoutSeleccionado] = useState(null);
 
-  // --- NUEVA: SINCRONIZACIÓN FORZADA DE RAMA (Corregida) ---
-  // Si el usuario cambia de rol a uno que NO es admin (o recarga la página), 
-  // lo anclamos a su rama correspondiente.
+  // SINCRONIZACIÓN FORZADA DE RAMA
   useEffect(() => {
     if (!esAdminORamaUniversal && funcionActual) {
       const ramaCorrecta = deducirRamaDelEducador(funcionActual);
-      // Solo actualizamos si la rama actual no coincide, para evitar loops
       if (ramaActiva !== ramaCorrecta) {
         setRamaActiva(ramaCorrecta);
       }
     }
-  }, [esAdminORamaUniversal, funcionActual]); // Quitamos 'ramaActiva' de las dependencias para evitar loops
+  }, [esAdminORamaUniversal, funcionActual]); 
 
-
-  // --- MIGRACIÓN DE DATOS DE ETAPAS ---
+  // MIGRACIÓN DE DATOS DE ETAPAS
   useEffect(() => {
     if (scouts && scouts.length > 0) {
       const mapeoEtapas = {
@@ -163,8 +156,13 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
 
   // 5. GUARDADO (Crear/Editar)
   const handleSaveScout = (datosScout) => {
+    // 👈 MAGIA DE CÓDIGO LIMPIO: 
+    // Si datosScout trae un ID, es porque estamos editando (desde familia o desde educador).
+    // Si no trae, intentamos usar el scoutSeleccionado (modal).
+    const idAEditar = datosScout.id || scoutSeleccionado?.id;
+
     const dniDuplicado = scouts.find(s => 
-      s.dni === datosScout.dni && s.id !== scoutSeleccionado?.id
+      s.dni === datosScout.dni && s.id !== idAEditar
     );
 
     if (dniDuplicado) {
@@ -172,9 +170,11 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
       return; 
     }
 
-    if (scoutSeleccionado) {
-      setScouts(prev => prev.map(s => s.id === scoutSeleccionado.id ? { ...s, ...datosScout } : s));
+    if (idAEditar) {
+      // 👈 Es una edición, actualizamos el scout exacto
+      setScouts(prev => prev.map(s => s.id === idAEditar ? { ...s, ...datosScout } : s));
     } else {
+      // Es una creación nueva
       const nuevaRama = datosScout.rama || ramaActiva;
       const idRamaNormalizado = nuevaRama.toUpperCase();
       

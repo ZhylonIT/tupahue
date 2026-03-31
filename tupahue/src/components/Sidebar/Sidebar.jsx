@@ -98,7 +98,7 @@ export const Sidebar = ({
     items.push({ id: 'calendario', label: 'Calendario', icon: <EventIcon />, vista: 'CALENDARIO' });
     
     if (esJefe || esEducadorDeRama || esAsistenteAdm) {
-      items.push({ id: 'documentos', label: 'Fichas Médicas', icon: <FolderShared />, vista: 'DOCUMENTOS' });
+      items.push({ id: 'documentos', label: 'Legajos', icon: <FolderShared />, vista: 'DOCUMENTOS' });
     }
 
     return items;

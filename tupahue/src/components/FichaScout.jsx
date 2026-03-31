@@ -1,98 +1,154 @@
 import { 
-  Dialog, DialogContent, DialogTitle, IconButton, Typography, 
-  Grid, Box, Avatar, Chip, Divider, Stack, List, ListItem, ListItemText 
+  Dialog, DialogTitle, DialogContent, Box, Typography, Grid, 
+  Avatar, Divider, Stack, IconButton, Button, Paper, Alert 
 } from '@mui/material';
 import { 
-  Close, Phone, MedicalServices, FamilyRestroom, 
-  Cake, Badge, EscalatorWarning, Bloodtype 
+  Close, LocalHospital, Phone, Home, Assignment, 
+  HistoryEdu, CheckCircle 
 } from '@mui/icons-material';
 
-const VIOLETA_SCOUT = '#5A189A';
-
-export const FichaScout = ({ open, onClose, scout }) => {
+export const FichaScout = ({ open, onClose, scout, onAvalarIngreso }) => {
   if (!scout) return null;
 
+  // Extraemos datos existentes cargados por la familia
+  const dm = scout.datosMedicos || {};
+  const dp = scout.datosPersonales || {};
+  
+  // Lógica de visualización del banner de aval
+  const tieneIngresoPendiente = scout.documentos?.includes('ingreso_menores') && !scout.avaladoPorEducadores;
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="body">
-      <DialogTitle sx={{ m: 0, p: 2, bgcolor: VIOLETA_SCOUT, color: 'white' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Ficha del Beneficiario</Typography>
-          <IconButton onClick={onClose} sx={{ color: 'white' }}><Close /></IconButton>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper">
+      <DialogTitle sx={{ m: 0, p: 2, bgcolor: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Avatar sx={{ bgcolor: '#5A189A', width: 50, height: 50 }}>
+            {scout.apellido?.charAt(0) || scout.nombre?.charAt(0)}
+          </Avatar>
+          <Box>
+            <Typography variant="h6" fontWeight={800}>{scout.apellido}, {scout.nombre}</Typography>
+            <Typography variant="caption" color="text.secondary">DNI: {scout.dni} • Rama: {scout.rama}</Typography>
+          </Box>
         </Stack>
+        <IconButton onClick={onClose}><Close /></IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3, mt: 2 }}>
-        <Grid container spacing={4}>
-          {/* Columna Izquierda: Foto y Perfil */}
-          <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
-            <Avatar 
-              sx={{ width: 120, height: 120, mx: 'auto', mb: 2, bgcolor: '#9D4EDD', fontSize: '3rem' }}
-            >
-              {scout.nombre[0]}
-            </Avatar>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>{scout.nombre}</Typography>
-            <Chip label={scout.patrulla} color="primary" sx={{ mt: 1, fontWeight: 700 }} />
-            
-            <Box sx={{ mt: 4, textAlign: 'left', bgcolor: '#f8f9fa', p: 2, borderRadius: 2 }}>
-              <Stack spacing={1.5}>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Badge fontSize="small" color="action" />
-                  <Typography variant="body2"><strong>DNI:</strong> {scout.dni}</Typography>
+      <DialogContent dividers sx={{ p: 3 }}>
+        
+        {/* BANNER DE AVAL */}
+        {tieneIngresoPendiente && (
+          <Alert 
+            severity="warning" 
+            variant="filled"
+            icon={<HistoryEdu />}
+            action={
+              <Button color="inherit" size="small" variant="outlined" onClick={() => onAvalarIngreso(scout.id)} sx={{ fontWeight: 'bold' }}>
+                AVALAR AHORA
+              </Button>
+            }
+            sx={{ mb: 3, borderRadius: 3 }}
+          >
+            Autorización de Ingreso pendiente de aval por educador.
+          </Alert>
+        )}
+
+        <Grid container spacing={3}>
+          {/* INFORMACIÓN DE SALUD */}
+          <Grid item xs={12} md={6}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, height: '100%' }}>
+              <Typography variant="subtitle2" color="primary" fontWeight={800} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalHospital fontSize="small" /> Información de Salud
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={1}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Alergias:</Typography>
+                  <Typography variant="body2" fontWeight={700} color={dm.alergia ? "error" : "success.main"}>
+                    {dm.alergia ? `SÍ: ${dm.cualAlergia}` : 'No declara'}
+                  </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Cake fontSize="small" color="action" />
-                  <Typography variant="body2"><strong>Edad:</strong> {scout.edad} años</Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Obra Social / Prepaga:</Typography>
+                  <Typography variant="body2">{dm.obraSocial || 'No especificada'}</Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Bloodtype fontSize="small" color="error" />
-                  <Typography variant="body2"><strong>Grupo Sanguíneo:</strong> 0+</Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Contacto de Emergencia:</Typography>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Phone sx={{ fontSize: 14 }} /> {dm.telEmergencia1} ({dm.personaEmergencia1})
+                  </Typography>
                 </Box>
               </Stack>
-            </Box>
+            </Paper>
           </Grid>
 
-          {/* Columna Derecha: Información Crítica */}
-          <Grid item xs={12} md={8}>
-            {/* CONTACTO DE EMERGENCIA */}
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FamilyRestroom color="primary" /> Contacto de Emergencia
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 2, mb: 3, borderColor: '#5A189A' }}>
-              <Typography variant="body1"><strong>Madre:</strong> Analía Rodríguez</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                <Phone fontSize="inherit" /> +54 9 11 5555-0123
+          {/* RESPONSABLES LEGALES - CORREGIDO SIMETRÍA */}
+          <Grid item xs={12} md={6}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, height: '100%' }}>
+              <Typography variant="subtitle2" color="primary" fontWeight={800} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Assignment fontSize="small" /> Responsables Legales
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={2}>
+                {/* Tutor 1 */}
+                <Box>
+                  <Typography variant="body2" fontWeight={700}>{dp.tutor1Nombre || 'No cargado'}</Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    {dp.tutor1Vinculo} • DNI: {dp.tutor1Dni}
+                  </Typography>
+                  {dp.tutor1Tel && (
+                    <Typography variant="caption" sx={{ color: '#2e7d32', fontWeight: 'bold', mt: 0.5, display: 'block' }}>
+                      WhatsApp/Tel: {dp.tutor1Tel}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Tutor 2 - Ahora con la misma lógica que el Tutor 1 */}
+                {dp.tutor2Nombre && (
+                  <Box>
+                    <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
+                    <Typography variant="body2" fontWeight={700}>{dp.tutor2Nombre}</Typography>
+                    <Typography variant="caption" display="block" color="text.secondary">
+                      {dp.tutor2Vinculo} • DNI: {dp.tutor2Dni}
+                    </Typography>
+                    {dp.tutor2Tel && (
+                      <Typography variant="caption" sx={{ color: '#2e7d32', fontWeight: 'bold', mt: 0.5, display: 'block' }}>
+                        WhatsApp/Tel: {dp.tutor2Tel}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Stack>
+            </Paper>
+          </Grid>
+
+          {/* DOMICILIO */}
+          <Grid item xs={12}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle2" color="primary" fontWeight={800} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Home fontSize="small" /> Domicilio Declarado
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Typography variant="body2">
+                {dm.domicilio || 'No especificado en Ficha Médica'}
               </Typography>
             </Paper>
-
-            {/* SALUD Y ALERGIAS */}
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <MedicalServices color="error" /> Información Médica
-            </Typography>
-            <Stack spacing={1} sx={{ mb: 3 }}>
-              <Box sx={{ p: 1.5, bgcolor: 'rgba(211, 47, 47, 0.05)', borderRadius: 1, borderLeft: '4px solid #d32f2f' }}>
-                <Typography variant="body2"><strong>Alergias:</strong> Penicilina, picadura de avispa.</Typography>
-              </Box>
-              <Box sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1 }}>
-                <Typography variant="body2"><strong>Obra Social:</strong> OSDE (N° 1234567/01)</Typography>
-              </Box>
-              <Box sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1 }}>
-                <Typography variant="body2"><strong>Medicamentos diarios:</strong> Ninguno.</Typography>
-              </Box>
-            </Stack>
-
-            {/* ADULTOS RESPONSABLES */}
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <EscalatorWarning color="primary" /> Adultos Responsables
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemText primary="Pedro Pérez (Padre)" secondary="Tel: 11 4444-0987" />
-              </ListItem>
-              <ListItem>
-                <ListItemText primary="Marta Gómez (Abuela)" secondary="Tel: 11 2222-3333" />
-              </ListItem>
-            </List>
           </Grid>
+
+          {/* LOG DE AVAL */}
+          {scout.avaladoPorEducadores && (
+            <Grid item xs={12}>
+              <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2, border: '1px solid #c8e6c9', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <CheckCircle sx={{ color: '#2e7d32' }} />
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#2e7d32', fontWeight: 'bold', display: 'block' }}>
+                    AVALADO POR EDUCADORES
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Firmado por {scout.educadorAvalista} el {scout.fechaAval}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </DialogContent>
     </Dialog>

@@ -14,13 +14,28 @@ export const useDocumentos = (scouts, ramaId) => {
   // Función para determinar si el legajo está 100% completo
   const legajoCompleto = (scout) => scout.fichaEntregada; 
 
-  // Filtrado múltiple (Rama y Búsqueda de texto) memorizado para mejor rendimiento
+  // --- NUEVA LÓGICA DE AVALES ---
+  // Detecta si el beneficiario subió la planilla de ingreso pero los educadores aún no la "firmaron"
+  const requiereFirmaIngreso = (scout) => {
+    const tieneDocIngreso = scout.documentos?.includes('ingreso_menores');
+    // Si tiene el documento pero NO tiene la propiedad de aval en true, requiere atención
+    return tieneDocIngreso && !scout.avaladoPorEducadores;
+  };
+
+  // Filtrado múltiple memorizado para mejor rendimiento
   const scoutsFiltrados = useMemo(() => {
     return scouts.filter(s => {
+      // Si es vista global, no filtramos por rama; si no, comparamos con la rama seleccionada
       const matchRama = esVistaGlobal || (s.rama && s.rama.toUpperCase() === idBusqueda);
-      const matchBusqueda = (s.nombre?.toLowerCase() || "").includes(busqueda.toLowerCase()) || 
-                            (s.apellido?.toLowerCase() || "").includes(busqueda.toLowerCase()) ||
-                            (s.dni?.toString() || "").includes(busqueda);
+      
+      // Búsqueda por Nombre, Apellido o DNI
+      const nom = (s.nombre || "").toLowerCase();
+      const ape = (s.apellido || "").toLowerCase();
+      const dni = (s.dni || "").toString();
+      const bus = busqueda.toLowerCase();
+
+      const matchBusqueda = nom.includes(bus) || ape.includes(bus) || dni.includes(bus);
+      
       return matchRama && matchBusqueda;
     });
   }, [scouts, busqueda, esVistaGlobal, idBusqueda]);
@@ -31,6 +46,7 @@ export const useDocumentos = (scouts, ramaId) => {
     esVistaGlobal, 
     CONFIG_RAMA,
     scoutsFiltrados, 
-    legajoCompleto
+    legajoCompleto,
+    requiereFirmaIngreso // Exportamos la nueva utilidad
   };
 };
