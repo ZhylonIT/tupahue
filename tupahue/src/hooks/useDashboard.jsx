@@ -38,6 +38,7 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
   const [vistaActual, setVistaActual] = useLocalStorage('tupahue_vista_actual', 'DASHBOARD');
   const [scouts, setScouts] = useLocalStorage('tupahue_scouts', datosIniciales);
   const [eventos, setEventos] = useLocalStorage('tupahue_eventos', eventosIniciales);
+  const [proyectos, setProyectos] = useLocalStorage('tupahue_proyectos', []);
 
   // 3. ESTADOS DE LA INTERFAZ
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -151,14 +152,49 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
 
     handleDeleteEvento: (id) => {
       setEventos(prev => prev.filter(e => e.id !== id));
+    },
+
+    handleDeleteProyecto: (id) => {
+      if (window.confirm("¿Deseas eliminar este proyecto? Se perderán todos los pasos cargados.")) {
+        setProyectos(prev => prev.filter(p => p.id !== id));
+      }
+    },
+
+    handleReviewProyecto: (proyectoId, nuevoEstado, comentarios, autoAgendar = false) => {
+      setProyectos(prev => prev.map(p => {
+        if (p.id === proyectoId) {
+          const proyActualizado = { 
+            ...p, 
+            estado: nuevoEstado, 
+            comentariosEducador: comentarios, 
+            fechaRevision: new Date(),
+            vistoPorJoven: false // Marca notificación para el joven
+          };
+
+          // LÓGICA DE AUTO-AGENDA
+          if (nuevoEstado === 'ACTIVO' && autoAgendar) {
+            handlers.handleAddEvento({
+              titulo: `INICIO: ${p.titulo}`,
+              descripcion: `Actividad de ${p.equipo} aprobada.`,
+              fecha: new Date().toISOString().split('T')[0],
+              tipo: 'Rama',
+              rama: p.rama
+            });
+          }
+          return proyActualizado;
+        }
+        return p;
+      }));
+    },
+
+    handleMarcarProyectoVisto: (proyectoId) => {
+      setProyectos(prev => prev.map(p => 
+        p.id === proyectoId ? { ...p, vistoPorJoven: true } : p
+      ));
     }
   };
 
-  // 5. GUARDADO (Crear/Editar)
   const handleSaveScout = (datosScout) => {
-    // 👈 MAGIA DE CÓDIGO LIMPIO: 
-    // Si datosScout trae un ID, es porque estamos editando (desde familia o desde educador).
-    // Si no trae, intentamos usar el scoutSeleccionado (modal).
     const idAEditar = datosScout.id || scoutSeleccionado?.id;
 
     const dniDuplicado = scouts.find(s => 
@@ -171,10 +207,8 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
     }
 
     if (idAEditar) {
-      // 👈 Es una edición, actualizamos el scout exacto
       setScouts(prev => prev.map(s => s.id === idAEditar ? { ...s, ...datosScout } : s));
     } else {
-      // Es una creación nueva
       const nuevaRama = datosScout.rama || ramaActiva;
       const idRamaNormalizado = nuevaRama.toUpperCase();
       
@@ -191,15 +225,35 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
     setScoutSeleccionado(null);
   };
 
+  const handleSaveProyecto = (datosProyecto) => {
+    setProyectos(prev => {
+      const existe = prev.find(p => p.id === datosProyecto.id);
+      
+      if (existe) {
+        return prev.map(p => p.id === datosProyecto.id ? { ...p, ...datosProyecto, ultimaModificacion: new Date() } : p);
+      } else {
+        return [...prev, { 
+          ...datosProyecto, 
+          id: Date.now(), 
+          fechaCreacion: new Date(),
+          estado: datosProyecto.estado || 'BORRADOR',
+          comentariosEducador: '',
+          vistoPorJoven: true // Al crearlo ya lo está viendo
+        }];
+      }
+    });
+  };
+
   return {
     ramaActiva, setRamaActiva,
     vistaActual, setVistaActual,
-    scouts, eventos,
+    scouts, eventos, proyectos,
     isFormOpen, setIsFormOpen,
     isDetailOpen, setIsDetailOpen,
     scoutSeleccionado,
     esAdminORamaUniversal,
     handlers,
-    handleSaveScout
+    handleSaveScout,
+    handleSaveProyecto
   };
 };

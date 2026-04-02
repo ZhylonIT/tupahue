@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Grid, Paper, Typography, Box, Stack, 
-  LinearProgress, Card, CardContent, Avatar, Divider, IconButton, Button, Tooltip
+  LinearProgress, Card, CardContent, Avatar, Divider, IconButton, Button, Alert
 } from '@mui/material';
 import { 
-  TrendingUp, Group, FactCheck, NotificationImportant,
-  Event as EventIcon, Public, AutoGraph, Assignment,
+  TrendingUp, Group, FactCheck, RocketLaunch,
+  Event as EventIcon, Public, Assignment,
   AccountBalanceWallet, Payments, School, WorkspacePremium, 
   WarningAmber, ChevronLeft, ChevronRight, LocationOn
 } from '@mui/icons-material';
@@ -39,11 +39,17 @@ const StatCard = ({ title, value, icon, color, subtitle, onClick }) => (
   </Paper>
 );
 
-export const DashboardView = ({ scouts = [], eventos = [], ramaId = 'CAMINANTES', userFuncion, setVistaActual }) => {
+export const DashboardView = ({ 
+  scouts = [], 
+  eventos = [], 
+  proyectos = [], // 👈 Prop agregada
+  ramaId = 'CAMINANTES', 
+  userFuncion, 
+  setVistaActual 
+}) => {
   const { movimientos } = useFinanzas();
   const { adultos } = useAdultos();
   
-  // Lógica de Carrusel
   const [currentEventIdx, setCurrentEventIdx] = useState(0);
 
   const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS';
@@ -52,9 +58,16 @@ export const DashboardView = ({ scouts = [], eventos = [], ramaId = 'CAMINANTES'
     ? { nombre: 'Todo el Grupo', color: VIOLETA_SCOUT } 
     : (RAMAS[idBusqueda] || RAMAS.CAMINANTES);
 
-  const esAsistentePrograma = userFuncion === FUNCIONES.ASISTENTE_PROG;
   const esAdmin = userFuncion === FUNCIONES.JEFE_GRUPO || userFuncion === FUNCIONES.ASISTENTE_ADM;
   const esAGA = userFuncion === FUNCIONES.ASISTENTE_ADULTOS;
+
+  // --- LÓGICA DE PROYECTOS PENDIENTES ---
+  const proyectosPendientes = useMemo(() => {
+    return proyectos.filter(p => {
+      const mismaRama = esVistaGlobal || p.rama?.toUpperCase() === ramaId?.toUpperCase();
+      return mismaRama && p.estado === 'PENDIENTE';
+    }).length;
+  }, [proyectos, ramaId, esVistaGlobal]);
 
   // --- CÁLCULOS REALES ADULTOS ---
   const statsAdultos = useMemo(() => {
@@ -79,14 +92,12 @@ export const DashboardView = ({ scouts = [], eventos = [], ramaId = 'CAMINANTES'
 
   const totalScouts = scouts.length;
   const conFicha = scouts.filter(s => s.fichaEntregada).length;
-  const porcentajeFichas = totalScouts > 0 ? (conFicha / totalScouts) * 100 : 0;
   
   const conteoPorRama = Object.values(RAMAS).map(r => ({
     ...r,
     cantidad: scouts.filter(s => s.rama?.toUpperCase() === r.id.toUpperCase()).length
   }));
 
-  // Navegación Carrusel
   const nextEvent = (e) => { e.stopPropagation(); setCurrentEventIdx((prev) => (prev + 1) % eventos.length); };
   const prevEvent = (e) => { e.stopPropagation(); setCurrentEventIdx((prev) => (prev - 1 + eventos.length) % eventos.length); };
 
@@ -111,6 +122,31 @@ export const DashboardView = ({ scouts = [], eventos = [], ramaId = 'CAMINANTES'
       </Box>
 
       <Grid container spacing={3}>
+        
+        {/* 🚨 ALERTA DE PROYECTOS PENDIENTES (Solo si hay) */}
+        {proyectosPendientes > 0 && (
+          <Grid item xs={12}>
+            <Alert 
+              severity="warning" 
+              variant="filled"
+              icon={<RocketLaunch />}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  sx={{ fontWeight: 900 }}
+                  onClick={() => setVistaActual('REVISION_PROYECTOS')}
+                >
+                  REVISAR AHORA
+                </Button>
+              }
+              sx={{ borderRadius: 4, mb: 1, fontWeight: 700 }}
+            >
+              Hay {proyectosPendientes} proyectos esperando Informe de Factibilidad en {CONFIG_RAMA.nombre}.
+            </Alert>
+          </Grid>
+        )}
+
         {/* CARDS DINÁMICAS */}
         <Grid item xs={12} sm={6} md={3}>
           <StatCard 
@@ -169,7 +205,7 @@ export const DashboardView = ({ scouts = [], eventos = [], ramaId = 'CAMINANTES'
                 conteoPorRama.map((r) => (
                   <Box key={r.id}>
                     <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                      <Typography variant="body2" component="div" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" component="div" sx={{ fontWeight: 700, display: 'center', display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: r.color }} /> {r.nombre}
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>{r.cantidad} beneficiarios</Typography>

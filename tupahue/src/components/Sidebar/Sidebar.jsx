@@ -4,7 +4,8 @@ import {
   Dashboard, People, BarChart, Event as EventIcon, 
   FolderShared, AccountBalanceWallet, Campaign, 
   AdminPanelSettings, Engineering, School,
-  Assignment, Payments, AccountBalance, WorkspacePremium 
+  Assignment, Payments, AccountBalance, WorkspacePremium,
+  RocketLaunch // Importado para la revisión de proyectos
 } from '@mui/icons-material';
 import { RAMAS } from '../../constants/ramas.jsx';
 import { FUNCIONES } from '../../constants/auth.jsx';
@@ -71,11 +72,14 @@ export const Sidebar = ({
     const esAsistenteProg = userFuncion === FUNCIONES.ASISTENTE_PROG;
     const esEducadorDeRama = [FUNCIONES.LOBATOS, FUNCIONES.SCOUTS, FUNCIONES.CAMINANTES, FUNCIONES.ROVERS].includes(userFuncion);
 
+    // LÓGICA DE PROGRAMA (Nómina, Progresión, Planis y ahora REVISIÓN DE PROYECTOS)
     if (esJefe || esEducadorDeRama || esAsistenteProg) {
       items.push(
         { id: 'nomina', label: esJefe || esAsistenteProg ? 'Nómina Global' : 'Mi Rama', icon: <People />, vista: esJefe || esAsistenteProg ? 'NOMINA_GLOBAL' : 'NOMINA' },
         { id: 'progresion', label: 'Progresión', icon: <BarChart />, vista: 'PROGRESION' },
-        { id: 'planificaciones', label: 'Planificaciones', icon: <Assignment />, vista: 'PLANIFICACIONES' }
+        { id: 'planificaciones', label: 'Planificaciones', icon: <Assignment />, vista: 'PLANIFICACIONES' },
+        // --- NUEVA OPCIÓN PARA REVISAR PROYECTOS DE LOS CHICOS ---
+        { id: 'proyectos', label: 'Revisión Proyectos', icon: <RocketLaunch />, vista: 'REVISION_PROYECTOS' }
       );
     }
 
@@ -106,16 +110,11 @@ export const Sidebar = ({
 
   // REGLA DE ORO: Sincronización estricta al cambiar el rol
   const handleRoleSwitched = (nuevaFuncion) => {
-    // 1. Si la nueva función es JEFE o PROG, pueden navegar, pero los llevamos a TODAS por inicio
-    // 2. Si es Asistente Técnico (Adm, Adultos, Com), los llevamos a TODAS y quedarán bloqueados por 'canChangeRama'
     if (funcionesGestion.includes(nuevaFuncion)) {
       onRamaChange('TODAS');
     } else {
-      // 3. Si es un educador volviendo a su rama, lo llevamos a su rama específica
       onRamaChange(nuevaFuncion.toUpperCase());
     }
-    
-    // Reset visual para evitar inconsistencias
     setVistaActual('DASHBOARD');
   };
 
@@ -137,7 +136,6 @@ export const Sidebar = ({
     >
       <SidebarHeader open={open} setOpen={setOpen} configColor={config.color} />
       
-      {/* canChangeRama viene del DashboardPage y bloqueará el selector para los técnicos */}
       <BranchSelector 
         open={open} 
         tienePermisoGlobal={tienePermisoGlobal} 
@@ -147,7 +145,13 @@ export const Sidebar = ({
         userFuncion={userFuncion} 
       />
       
-      <NavMenu open={open} items={menuItems} vistaActual={vistaActual} setVistaActual={setVistaActual} config={config} />
+      <NavMenu 
+        open={open} 
+        items={menuItems} 
+        vistaActual={vistaActual} 
+        setVistaActual={setVistaActual} 
+        config={config} 
+      />
       
       <UserFooter 
         open={open} 

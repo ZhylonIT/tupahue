@@ -1,4 +1,4 @@
-import { useMemo } from 'react'; // 👈 AGREGADO: Importación necesaria de React
+import { useMemo } from 'react'; 
 import { Box, CssBaseline, Toolbar } from '@mui/material';
 import { ROLES, FUNCIONES } from '../constants/auth.jsx';
 import { Sidebar } from '../components/Sidebar/Sidebar'; 
@@ -11,14 +11,12 @@ export const DashboardPage = () => {
   // 1. Consumimos el contexto real
   const { user, userFuncion, logout } = useAuth();
 
-  // 2. REGLA DE NEGOCIO ESTRICTA (Verificada):
-  // Solo estas dos funciones específicas pueden cambiar el ámbito de rama.
-  // Los asistentes técnicos (Adm, Adultos, Com) deben quedar bloqueados en 'TODAS'.
+  // 2. REGLA DE NEGOCIO ESTRICTA
   const puedeCambiarRama = useMemo(() => {
     return userFuncion === FUNCIONES.JEFE_GRUPO || userFuncion === FUNCIONES.ASISTENTE_PROG;
   }, [userFuncion]);
 
-  // 3. Hook con lógica reactiva usando los datos del contexto
+  // 3. Hook con lógica reactiva
   const state = useDashboard(user, [], [], userFuncion);
 
   // Protección de renderizado
@@ -28,15 +26,16 @@ export const DashboardPage = () => {
     <Box sx={{ display: 'flex', bgcolor: '#f8f9fa', minHeight: '100vh' }}>
       <CssBaseline />
       
-      {/* SIDEBAR: Enviamos canChangeRama estrictamente calculado */}
+      {/* SIDEBAR: Usamos state.setVistaActual correctamente */}
       <Sidebar 
         ramaSeleccionada={state.ramaActiva} 
         onRamaChange={state.setRamaActiva} 
         vistaActual={state.vistaActual}
         setVistaActual={state.setVistaActual}        
-        canChangeRama={puedeCambiarRama} // 👈 PROP CLAVE
+        canChangeRama={puedeCambiarRama} 
         userFuncion={userFuncion}
         onLogout={logout}
+        proyectos={state.proyectos}
       />
 
       <Box 
@@ -54,11 +53,12 @@ export const DashboardPage = () => {
         {user.rol === ROLES.EDUCADOR && (
           <EducadorMainView 
             vistaActual={state.vistaActual}
-            setVistaActual={state.setVistaActual}
+            setVistaActual={state.setVistaActual} // 👈 CORREGIDO: Ahora usa state.setVistaActual
             setRamaActiva={state.setRamaActiva}
             ramaActiva={state.ramaActiva}
             scouts={state.scouts}
             eventos={state.eventos}
+            proyectos={state.proyectos} 
             handlers={state.handlers}
             userFuncion={userFuncion} 
           />

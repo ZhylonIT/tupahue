@@ -8,8 +8,9 @@ import { NoticiasView } from './noticias/NoticiasView';
 import { FinanzasView } from './finanzas/FinanzasView'; 
 import { CuotasView } from './finanzas/CuotasView'; 
 import { PresupuestoView } from './finanzas/PresupuestoView'; 
-// 👇 IMPORTAMOS LA NUEVA VISTA DE ADULTOS
 import { AdultosView } from './adultos/AdultosView';
+// 👇 IMPORTAMOS LA NUEVA VISTA DE REVISIÓN
+import { RevisionProyectosView } from './proyectos/RevisionProyectosView';
 import { Box } from '@mui/material';
 
 export const EducadorMainView = ({ 
@@ -19,11 +20,12 @@ export const EducadorMainView = ({
   ramaActiva, 
   scouts, 
   eventos, 
+  proyectos = [], // 👈 AGREGADO: Recibimos los proyectos del state global
   handlers,
   userFuncion 
 }) => {
   
-  // Lógica de filtrado por rama
+  // Lógica de filtrado por rama para beneficiarios
   const scoutsFiltrados = scouts?.filter(s => {
     if (ramaActiva === 'TODAS') return true;
     const ramaScout = s.rama || ""; 
@@ -35,12 +37,15 @@ export const EducadorMainView = ({
     userFuncion: userFuncion 
   };
 
+  const esVistaGlobal = ramaActiva === 'TODAS';
+
   switch (vistaActual) {
     case 'DASHBOARD': 
       return (
         <DashboardView 
           scouts={scoutsFiltrados} 
           eventos={eventos} 
+          proyectos={proyectos} // 👈 Pasamos proyectos para la alerta del banner
           setVistaActual={setVistaActual}
           {...commonProps} 
         />
@@ -50,7 +55,7 @@ export const EducadorMainView = ({
     case 'NOMINA_GLOBAL': 
       return (
         <NominaView 
-          scouts={ramaActiva === 'TODAS' ? scouts : scoutsFiltrados} 
+          scouts={esVistaGlobal ? scouts : scoutsFiltrados} 
           {...commonProps} 
           onToggleAsistencia={handlers.handleToggleAsistencia}
           onEdit={handlers.handleOpenForm} 
@@ -73,6 +78,17 @@ export const EducadorMainView = ({
 
     case 'PLANIFICACIONES':
       return <PlanificacionesView ramaId={ramaActiva} {...commonProps} />;
+
+    // 👇 NUEVO CASO: REVISIÓN DE PROYECTOS (CACERÍAS / EMPRESAS)
+    case 'REVISION_PROYECTOS':
+      return (
+        <RevisionProyectosView 
+          proyectos={proyectos} 
+          onReview={handlers.handleReviewProyecto}
+          esVistaGlobal={esVistaGlobal}
+          {...commonProps} 
+        />
+      );
 
     case 'CALENDARIO':
       return (
@@ -99,7 +115,6 @@ export const EducadorMainView = ({
     case 'PRESUPUESTO':
       return <PresupuestoView />;
 
-    // 👇 NUEVO CASO PARA GESTIÓN DE ADULTOS
     case 'ADULTOS':
       return <AdultosView {...commonProps} />;
 
@@ -108,6 +123,7 @@ export const EducadorMainView = ({
         <DashboardView 
           scouts={scoutsFiltrados} 
           eventos={eventos} 
+          proyectos={proyectos}
           setVistaActual={setVistaActual}
           {...commonProps} 
         />

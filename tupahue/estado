@@ -1,0 +1,71 @@
+📜 DOCUMENTO DE CONTINUIDAD: Proyecto Tupahue (Actualizado Abril 2026)
+Reglas de Oro para el Modelo de IA Análisis Previo: Antes de escribir código, analizar el impacto en el proyecto para no "ensuciar".
+Código Completo: Siempre devolver el componente modificado completo para evitar rupturas por código fragmentado.
+Minimalismo: No agregar dependencias o lógica innecesaria si ya existe una solución en las constantes.
+
+Arquitectura Técnica Stack: React 19, Vite, Material UI (MUI).
+Ruteo de Datos: Los datos del joven activo vienen de useDashboard. Existe un Dev-Switch en JovenDashboardPage.jsx para simular cualquier scout.
+Persistencia: LocalStorage mediante hooks personalizados (useLocalStorage).
+Servicios Externos: jsPDF y jspdf-autotable para reportes oficiales.
+Estado del Desarrollo por Módulos
+
+Módulo Progresión (100%):
+Lógica de metas oficiales y visualización gamificada terminada.
+Incluye Proyección Rover y Línea de Tiempo.
+Módulo Proyectos / Cacerías (95% - En Ajuste Final):
+Flujo Joven: Creación paso a paso (Stepper) de Proyectos/Cacerías. Se ha corregido la navegación para que, al estar Aprobado/Activo, el joven pueda recorrer los pasos en modo Solo Lectura sin quedar bloqueado en el primer paso.
+Flujo Educador: Vista de revisión de factibilidad con capacidad de aprobación, observación o rechazo.
+Integración Calendario: Opción de auto-agendado al aprobar un proyecto (checkbox desactivado por defecto para evitar errores).
+Documentación: Generación de PDF oficial del proyecto con los datos del joven y el dictamen del educador.
+Pendientes Críticos (Log de Futuro) 🚨 SISTEMA DE NOTIFICACIONES (BADGES): Se ha diseñado la lógica en useDashboard (vistoPorJoven), pero la implementación visual en los Sidebars (globos rojos de notificación) se pospone para una etapa de pulido de UI/UX futura. NO OLVIDAR: Conectar los badges cuando se trabaje en la experiencia de usuario "en tiempo real".
+Próximo Paso: Vista "Mi Rama" e Identidad Diseñar src/views/joven/MiRamaView.jsx.
+Integrar la Ley y Promesa (Marco Simbólico) según la rama.
+Mostrar el resumen del Pequeño Grupo (Patrulla/Seisena/Equipo).
+Estado del Desarrollo
+Módulo Progresión (100%): Metas, SENDEROS y Línea de Tiempo terminados.
+Módulo Proyectos / Cacerías (100%): * Stepper navegable en modo readOnly para proyectos activos.
+Generación de PDF institucional funcional.
+Revisión de educador con checkbox de calendario desactivado por defecto.
+🚨 Pendiente (Log de Futuro): Activar los Badges (notificaciones) en el Sidebar cuando entremos en fase de pulido de UI.
+Terminología: Se eliminó definitivamente el término "Empresa". Se utiliza Proyecto (o Cacería para Lobatos).
+Conexión de Datos: La vista de "Mi Rama" ahora debe reflejar el proyectoActivo real del equipo, consultando el estado de los proyectos en el sistema.
+🚨 MÓDULO DE ASISTENCIA (Upgrade): Se desarrollará de cero vinculándolo a las actividades planificadas en el calendario. El porcentaje de asistencia será: (Eventos asistidos / Total de eventos pasados).
+
+Actualización del Módulo de Proyectos (Abril 2026)
+1. Cierre del Ciclo de Vida: Evaluación y Finalización
+Se implementó la fase final del proyecto, permitiendo que los jóvenes cierren sus aventuras una vez ejecutadas.
+Estado "FINALIZADO": Se añadió un nuevo estado al flujo lógico de los proyectos.
+Botón de Acción Dinámico: En el listado de proyectos, aparece el botón "Finalizar" (ícono de verificación) únicamente cuando el proyecto está en estado ACTIVO.
+Persistencia de Datos: El sistema ahora registra y guarda tres nuevos campos críticos:
+evaluacionJoven: Reflexión escrita por el equipo sobre la experiencia.
+nivelLogro: Indicador pedagógico (Total, Parcial o Cambio de rumbo).
+fechaFinalizacion: Registro histórico del cierre de la actividad.
+2. Refactorización y Modularización (Limpieza de Código)
+Para evitar la saturación de archivos y mejorar el mantenimiento, se aplicaron las siguientes mejoras de arquitectura:
+Extracción del Modal: Se creó el componente independiente ModalFinalizarProyecto.jsx. Esto redujo significativamente las líneas de código en la vista principal y encapsuló la lógica de evaluación.
+UI/UX Optimizada: * El Stepper ahora permite visualizar la evaluación final en el Paso 4 ("Revisión") una vez que el proyecto está finalizado.
+Se mejoró la legibilidad de la tabla de proyectos con colores dinámicos para el estado "Finalizado" (Color Info/Azul).
+3. Integración con el Dashboard Global
+Tubería de Datos (useDashboard): Se verificó que el hook de gestión sea capaz de persistir los nuevos campos de evaluación de forma automática mediante el operador de propagación (spread operator), manteniendo el archivo de lógica limpio de código redundante.
+Sincronización con "Mi Rama": Al pasar un proyecto a estado "Finalizado", la tarjeta de la vista de Rama se libera automáticamente, mostrando nuevamente el mensaje motivador para invitar al pequeño grupo a soñar su próximo desafío.
+Nota de Desarrollo: Con esta implementación, el Módulo de Proyectos se considera 100% Funcional en su versión estable, cubriendo desde la idea inicial ("El Sueño") hasta la reflexión final del equipo.
+🚨 Pendiente (Log de Futuro): En "Mi rama" configurar la info de la patrulla/equipo.
+
+🏁 Finalización: Dashboard de Jóvenes (Abril 2026)
+1. Experiencia de Usuario e Identidad
+Landing Page: Se estableció "Mi Rama" como la vista por defecto al iniciar sesión, priorizando la identidad del "Pequeño Grupo" (Patrulla/Seisena/Equipo) y el Marco Simbólico (Ley y Promesa) según la rama.
+Navegación: Sidebar reordenado para un flujo lógico: Identidad de Rama → Progresión Personal → Proyectos.
+2. Ciclo de Vida de Proyectos / Cacerías (100% Funcional)
+Se completó el módulo de proyectos con capacidad de autogestión total:
+Gestión: Creación, edición de borradores y envío a revisión mediante un Stepper intuitivo.
+Documentación: Generación de PDF institucional con jsPDF-autotable para presentación de proyectos.
+Cierre y Evaluación: Implementación de un Modal de Finalización que permite al equipo realizar su evaluación final, registrar el grado de logro del sueño y asentar fechas de cierre.
+Conexión Real: La vista de inicio ahora refleja en tiempo real si existe un proyecto ACTIVO, motivando al joven en caso de no tener uno en curso.
+3. Autonomía Rover: Gestión Financiera. Se habilitó el módulo "Mis Finanzas" exclusivo para la rama Rovers, permitiendo la gestión adulta de sus cuentas:
+Estado de Cuenta Personal: Conexión directa con el historial de ingresos cargado por la administración.
+Transparencia: Filtro robusto por ID/DNI que asegura que cada Rover vea solo sus aportes.
+Recibos Oficiales: Integración del sistema de impresión en A4 para que el joven pueda descargar o imprimir sus comprobantes legales directamente desde su panel.
+4. Arquitectura y Calidad de Código
+Modularización: Se extrajeron componentes complejos (Modales de evaluación, Plantillas de recibo) para mantener las vistas principales limpias y fáciles de mantener.
+Sincronización: Uso de useMemo y efectos de sincronización para garantizar que los datos del localStorage se reflejen instantáneamente en toda la aplicación.
+Normalización: Blindaje en la búsqueda de datos mediante normalización de texto (Mayúsculas/Recorte de espacios) para evitar errores de vinculación.

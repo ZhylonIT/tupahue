@@ -1,23 +1,26 @@
-import { Box, Typography, IconButton } from '@mui/material';
-import { Menu as MenuIcon, ChevronLeft } from '@mui/icons-material';
+import { Box, Typography } from '@mui/material';
 
-export const SidebarHeader = ({ open, setOpen, configColor }) => {
+export const SidebarHeader = ({ colorRama }) => {
   return (
     <Box sx={{ 
-      p: 2, 
+      p: 3, 
       display: 'flex', 
       alignItems: 'center', 
-      justifyContent: open ? 'space-between' : 'center', 
-      minHeight: 80 
+      justifyContent: 'center',
+      minHeight: '80px' 
     }}>
-      {open && (
-        <Typography variant="h6" sx={{ fontWeight: 900, letterSpacing: 1, color: configColor }}>
-          TUPAHUE
-        </Typography>
-      )}
-      <IconButton onClick={() => setOpen(!open)} sx={{ color: 'white' }}>
-        {open ? <ChevronLeft /> : <MenuIcon />}
-      </IconButton>
+      <Typography 
+        variant="h5" 
+        sx={{ 
+          fontWeight: 900, 
+          color: colorRama || '#0ee2e5', // Usa el color de la rama o el turquesa por defecto
+          letterSpacing: 3,
+          fontFamily: '"Ubuntu", sans-serif',
+          textShadow: `0 0 20px ${colorRama}44`
+        }}
+      >
+        TUPAHUE
+      </Typography>
     </Box>
   );
 };
