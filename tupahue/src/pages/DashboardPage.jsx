@@ -8,34 +8,27 @@ import { useDashboard } from '../hooks/useDashboard';
 import { useAuth } from '../context/AuthContext';
 
 export const DashboardPage = () => {  
-  // 1. Consumimos el contexto real
-  const { user, userFuncion, logout } = useAuth();
+  const { user, userFuncion } = useAuth();
 
-  // 2. REGLA DE NEGOCIO ESTRICTA
   const puedeCambiarRama = useMemo(() => {
     return userFuncion === FUNCIONES.JEFE_GRUPO || userFuncion === FUNCIONES.ASISTENTE_PROG;
   }, [userFuncion]);
 
-  // 3. Hook con lógica reactiva
-  // 🚩 NOTA: Por ahora pasamos [] porque todavía no buscamos los datos en Supabase
   const state = useDashboard(user, [], [], userFuncion);
 
-  // Protección de renderizado
   if (!user) return null;
 
   return (
     <Box sx={{ display: 'flex', bgcolor: '#f8f9fa', minHeight: '100vh' }}>
       <CssBaseline />
       
+      {/* 🔄 Sidebar Universal configurado para Educador */}
       <Sidebar 
         ramaSeleccionada={state.ramaActiva} 
         onRamaChange={state.setRamaActiva} 
         vistaActual={state.vistaActual}
         setVistaActual={state.setVistaActual}         
         canChangeRama={puedeCambiarRama} 
-        userFuncion={userFuncion}
-        onLogout={logout}
-        proyectos={state.proyectos}
       />
 
       <Box 
@@ -45,13 +38,11 @@ export const DashboardPage = () => {
           p: { xs: 2, sm: 4 }, 
           width: { sm: `calc(100% - 280px)` }, 
           mt: { xs: 8, sm: 0 },
-          transition: 'width 0.3s'
+          transition: 'all 0.3s'
         }}
       >
         <Toolbar sx={{ display: { xs: 'block', sm: 'none' } }} />
         
-        {/* 🛠️ CORRECCIÓN AQUÍ: 
-            Cambiamos user.rol por user.role y permitimos ADMIN */}
         {(user.role === ROLES.EDUCADOR || user.role === 'ADMIN') && (
           <EducadorMainView 
             vistaActual={state.vistaActual}

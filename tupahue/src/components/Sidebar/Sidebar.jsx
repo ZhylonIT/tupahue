@@ -1,166 +1,137 @@
 import { useState, useMemo } from 'react';
-import { Drawer } from '@mui/material';
+import { Drawer, Box } from '@mui/material';
 import { 
-  Dashboard, People, BarChart, Event as EventIcon, 
-  FolderShared, AccountBalanceWallet, Campaign, 
-  AdminPanelSettings, Engineering, School,
-  Assignment, Payments, AccountBalance, WorkspacePremium,
-  RocketLaunch // Importado para la revisión de proyectos
+  Dashboard, People, BarChart, Event, FolderShared, AccountBalanceWallet, 
+  Campaign, AdminPanelSettings, Engineering, School, Assignment, Payments, 
+  AccountBalance, WorkspacePremium, RocketLaunch, FamilyRestroom, ReceiptLong, TrendingUp, Groups, EmojiEvents, Description
 } from '@mui/icons-material';
-import { RAMAS } from '../../constants/ramas.jsx';
-import { FUNCIONES } from '../../constants/auth.jsx';
 
+import { RAMAS, ROLES_GESTION } from '../../constants/ramas';
+import { FUNCIONES, ROLES } from '../../constants/auth';
 import { SidebarHeader } from './SidebarHeader';
 import { BranchSelector } from './BranchSelector';
 import { NavMenu } from './NavMenu';
 import { UserFooter } from './UserFooter';
+import { useAuth } from '../../context/AuthContext';
 
 const drawerWidth = 280;
 
-// Definimos los colores y fondos para las funciones de gestión
-const COLORES_GESTION = {
-  [FUNCIONES.JEFE_GRUPO]: { color: '#8e44ad', fondo: 'rgba(142, 68, 173, 0.15)' },
-  [FUNCIONES.ASISTENTE_PROG]: { color: '#e67e22', fondo: 'rgba(230, 126, 34, 0.15)' },
-  [FUNCIONES.ASISTENTE_ADULTOS]: { color: '#c0392b', fondo: 'rgba(192, 57, 43, 0.15)' },
-  [FUNCIONES.ASISTENTE_COM]: { color: '#1a5276', fondo: 'rgba(26, 82, 118, 0.15)' },
-  [FUNCIONES.ASISTENTE_ADM]: { color: '#1b5e20', fondo: 'rgba(27, 94, 32, 0.15)' },
-};
-
-const getRoleIcon = (func) => {
-  if (func === FUNCIONES.JEFE_GRUPO) return <AdminPanelSettings sx={{ fontSize: 20 }} />;
-  if (func?.startsWith('ASISTENTE_')) return <Engineering sx={{ fontSize: 20 }} />;
-  return <School sx={{ fontSize: 20 }} />;
-};
-
-const getCargoLabel = (func) => {
-  const nombres = {
-    [FUNCIONES.JEFE_GRUPO]: "Jefe de Grupo",
-    [FUNCIONES.ASISTENTE_PROG]: "Asistente de Programa",
-    [FUNCIONES.ASISTENTE_ADM]: "Asistente de Administración",
-    [FUNCIONES.ASISTENTE_ADULTOS]: "Asistente de Adultos",
-    [FUNCIONES.ASISTENTE_COM]: "Asistente de Comunicaciones"
-  };
-  return nombres[func] || `Educador ${RAMAS[func?.toUpperCase()]?.nombre || "Rama"}`;
-};
-
-export const Sidebar = ({ 
-  ramaSeleccionada, 
-  onRamaChange, 
-  vistaActual, 
-  setVistaActual, 
-  canChangeRama = false, 
-  userFuncion 
-}) => {
+export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaActual, canChangeRama }) => {
+  const { user, userFuncion } = useAuth();
   const [open, setOpen] = useState(true);
 
-  // Funciones que activan el modo "Gestión" (Vista Global)
-  const funcionesGestion = Object.keys(COLORES_GESTION);
-  const tienePermisoGlobal = useMemo(() => funcionesGestion.includes(userFuncion), [userFuncion]);
-
+  // 🎯 MAPEADO DE COLORES DESDE CONSTANTES REALES
   const config = useMemo(() => {
-    if (COLORES_GESTION[userFuncion]) return COLORES_GESTION[userFuncion];
-    const ramaData = RAMAS[ramaSeleccionada?.toUpperCase()] || RAMAS.CAMINANTES;
-    return { color: ramaData.color, fondo: ramaData.colorFondo };
-  }, [userFuncion, ramaSeleccionada]);
+    const mapaColores = {
+      [FUNCIONES.JEFE_GRUPO]: ROLES_GESTION.JEFE_GRUPO.color,
+      [FUNCIONES.ASISTENTE_PROG]: ROLES_GESTION.PROGRAMA.color,
+      [FUNCIONES.ASISTENTE_ADM]: ROLES_GESTION.FINANZAS.color,
+      [FUNCIONES.ASISTENTE_COM]: ROLES_GESTION.COMUNICACIONES.color,
+      [FUNCIONES.ASISTENTE_ADULTOS]: ROLES_GESTION.ADULTOS.color,
+    };
+
+    if (mapaColores[userFuncion]) {
+      return { color: mapaColores[userFuncion], fondo: `${mapaColores[userFuncion]}22` };
+    }
+
+    if (user?.role === ROLES.FAMILIA) {
+      return { color: '#9d4edd', fondo: 'rgba(157, 78, 221, 0.15)' };
+    }
+
+    const ramaKey = userFuncion?.replace('PROTAGONISTA_', '') || 'SCOUTS';
+    const ramaData = RAMAS[ramaKey] || RAMAS.SCOUTS;
+    return { color: ramaData.color, fondo: `${ramaData.color}22` };
+  }, [userFuncion, user]);
+
+  const getRoleIcon = (func) => {
+    if (func === FUNCIONES.JEFE_GRUPO) return <AdminPanelSettings sx={{ fontSize: 20 }} />;
+    if (func?.startsWith('ASISTENTE_')) return <Engineering sx={{ fontSize: 20 }} />;
+    if (func?.startsWith('PROTAGONISTA_')) return <Groups sx={{ fontSize: 20 }} />;
+    if (func === 'FAMILIA' || user?.role === ROLES.FAMILIA) return <FamilyRestroom sx={{ fontSize: 20 }} />;
+    return <School sx={{ fontSize: 20 }} />;
+  };
+
+  const getCargoLabel = (func) => {
+    if (user?.role === ROLES.FAMILIA) return "Portal de Familia";
+    if (func?.startsWith('PROTAGONISTA_')) {
+      const ramaKey = func.replace('PROTAGONISTA_', '');
+      return `Protagonista ${RAMAS[ramaKey]?.nombre || 'Rama'}`;
+    }
+
+    const etiquetas = {
+      [FUNCIONES.JEFE_GRUPO]: ROLES_GESTION.JEFE_GRUPO.nombre,
+      [FUNCIONES.ASISTENTE_PROG]: ROLES_GESTION.PROGRAMA.nombre,
+      [FUNCIONES.ASISTENTE_ADM]: ROLES_GESTION.FINANZAS.nombre,
+      [FUNCIONES.ASISTENTE_ADULTOS]: ROLES_GESTION.ADULTOS.nombre,
+      [FUNCIONES.ASISTENTE_COM]: ROLES_GESTION.COMUNICACIONES.nombre,
+    };
+
+    return etiquetas[func] || `Educador ${RAMAS[func]?.nombre || "Rama"}`;
+  };
 
   const menuItems = useMemo(() => {
+    if (user?.role === ROLES.FAMILIA) {
+      return [
+        { id: 'MIS_HIJOS', label: 'Mis Hijos', icon: <FamilyRestroom />, vista: 'MIS_HIJOS' },
+        { id: 'FINANZAS', label: 'Cuotas y Recibos', icon: <ReceiptLong />, vista: 'FINANZAS' },
+        { id: 'DOCUMENTACION', label: 'Documentación', icon: <FolderShared />, vista: 'DOCUMENTACION' },
+        { id: 'PROGRESION', label: 'Progresión Scout', icon: <TrendingUp />, vista: 'PROGRESION' },
+      ];
+    }
+
+    if (userFuncion?.startsWith('PROTAGONISTA_')) {
+      const ramaId = userFuncion.replace('PROTAGONISTA_', '');
+      const items = [
+        { id: 'MI_RAMA', label: 'Mi Rama', icon: <Groups />, vista: 'MI_RAMA' },
+        { id: 'PROGRESION', label: 'Mi Progresión', icon: <EmojiEvents />, vista: 'PROGRESION' },
+        { id: 'PROYECTOS', label: ramaId === 'LOBATOS' ? 'Mi Cacería' : 'Mis Proyectos', icon: <RocketLaunch />, vista: 'PROYECTOS' },
+      ];
+      if (ramaId === 'ROVERS') {
+        items.push(
+          { id: 'FINANZAS', label: 'Mis Finanzas', icon: <AccountBalanceWallet />, vista: 'FINANZAS' },
+          { id: 'DOCUMENTACION', label: 'Mi Documentación', icon: <Description />, vista: 'DOCUMENTACION' }
+        );
+      }
+      return items;
+    }
+
     const items = [{ id: 'dashboard', label: 'Inicio', icon: <Dashboard />, vista: 'DASHBOARD' }];
-
     const esJefe = userFuncion === FUNCIONES.JEFE_GRUPO;
-    const esAsistenteAdm = userFuncion === FUNCIONES.ASISTENTE_ADM;
-    const esAsistenteAdultos = userFuncion === FUNCIONES.ASISTENTE_ADULTOS;
     const esAsistenteProg = userFuncion === FUNCIONES.ASISTENTE_PROG;
-    const esEducadorDeRama = [FUNCIONES.LOBATOS, FUNCIONES.SCOUTS, FUNCIONES.CAMINANTES, FUNCIONES.ROVERS].includes(userFuncion);
+    const esEducador = [FUNCIONES.LOBATOS, FUNCIONES.SCOUTS, FUNCIONES.CAMINANTES, FUNCIONES.ROVERS].includes(userFuncion);
 
-    // LÓGICA DE PROGRAMA (Nómina, Progresión, Planis y ahora REVISIÓN DE PROYECTOS)
-    if (esJefe || esEducadorDeRama || esAsistenteProg) {
+    if (esJefe || esEducador || esAsistenteProg) {
       items.push(
         { id: 'nomina', label: esJefe || esAsistenteProg ? 'Nómina Global' : 'Mi Rama', icon: <People />, vista: esJefe || esAsistenteProg ? 'NOMINA_GLOBAL' : 'NOMINA' },
         { id: 'progresion', label: 'Progresión', icon: <BarChart />, vista: 'PROGRESION' },
         { id: 'planificaciones', label: 'Planificaciones', icon: <Assignment />, vista: 'PLANIFICACIONES' },
-        // --- NUEVA OPCIÓN PARA REVISAR PROYECTOS DE LOS CHICOS ---
         { id: 'proyectos', label: 'Revisión Proyectos', icon: <RocketLaunch />, vista: 'REVISION_PROYECTOS' }
       );
     }
-
-    if (esJefe || esAsistenteAdultos) {
-      items.push({ id: 'adultos', label: 'Gestión de Adultos', icon: <WorkspacePremium />, vista: 'ADULTOS' });
-    }
-
-    if (esJefe || esAsistenteAdm) {
-      items.push(
-        { id: 'finanzas', label: 'Caja del Grupo', icon: <AccountBalanceWallet />, vista: 'FINANZAS' },
-        { id: 'cuotas', label: 'Estado de Cuotas', icon: <Payments />, vista: 'CUOTAS' },        
-        { id: 'presupuesto', label: 'Presupuesto Anual', icon: <AccountBalance />, vista: 'PRESUPUESTO' }
-      );
-    }
-
-    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_COM) {
-      items.push({ id: 'noticias', label: 'Panel de noticias', icon: <Campaign />, vista: 'NOTICIAS' });
-    }
-
-    items.push({ id: 'calendario', label: 'Calendario', icon: <EventIcon />, vista: 'CALENDARIO' });
-    
-    if (esJefe || esEducadorDeRama || esAsistenteAdm) {
-      items.push({ id: 'documentos', label: 'Legajos', icon: <FolderShared />, vista: 'DOCUMENTOS' });
-    }
-
+    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_ADM) items.push({ id: 'finanzas', label: 'Caja del Grupo', icon: <AccountBalanceWallet />, vista: 'FINANZAS' });
+    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_COM) items.push({ id: 'noticias', label: 'Panel de Noticias', icon: <Campaign />, vista: 'NOTICIAS' });
+    items.push({ id: 'calendario', label: 'Calendario', icon: <Event />, vista: 'CALENDARIO' });
+    if (esJefe || esEducador || userFuncion === FUNCIONES.ASISTENTE_ADM) items.push({ id: 'documentos', label: 'Legajos', icon: <FolderShared />, vista: 'DOCUMENTOS' });
     return items;
-  }, [userFuncion]);
+  }, [userFuncion, user]);
 
-  // REGLA DE ORO: Sincronización estricta al cambiar el rol
   const handleRoleSwitched = (nuevaFuncion) => {
-    if (funcionesGestion.includes(nuevaFuncion)) {
-      onRamaChange('TODAS');
-    } else {
-      onRamaChange(nuevaFuncion.toUpperCase());
-    }
-    setVistaActual('DASHBOARD');
+    if (ROLES_GESTION[nuevaFuncion] || nuevaFuncion === FUNCIONES.JEFE_GRUPO) onRamaChange('TODAS');
+    else if (!nuevaFuncion.startsWith('PROTAGONISTA_') && nuevaFuncion !== 'FAMILIA') onRamaChange(nuevaFuncion.toUpperCase());
+    setVistaActual(user?.role === ROLES.FAMILIA ? 'MIS_HIJOS' : 'DASHBOARD');
   };
 
   return (
-    <Drawer 
-      variant="permanent"
-      sx={{
-        width: open ? drawerWidth : 70, 
-        transition: 'width 0.3s',
-        '& .MuiDrawer-paper': { 
-          width: open ? drawerWidth : 70, 
-          transition: 'width 0.3s', 
-          overflowX: 'hidden', 
-          bgcolor: '#1a1a1a', 
-          color: 'white', 
-          borderRight: 'none' 
-        },
-      }}
-    >
-      <SidebarHeader open={open} setOpen={setOpen} configColor={config.color} />
+    <Drawer variant="permanent" sx={{ width: open ? drawerWidth : 70, transition: 'width 0.3s', '& .MuiDrawer-paper': { width: open ? drawerWidth : 70, overflowX: 'hidden', bgcolor: '#121212', color: 'white', borderRight: 'none', boxShadow: '10px 0 30px rgba(0,0,0,0.5)' } }}>
+      <SidebarHeader open={open} user={user} config={config} getCargoLabel={getCargoLabel} userFuncion={userFuncion} />
       
-      <BranchSelector 
-        open={open} 
-        tienePermisoGlobal={tienePermisoGlobal} 
-        canChangeRama={canChangeRama} 
-        ramaSeleccionada={ramaSeleccionada} 
-        onRamaChange={onRamaChange} 
-        userFuncion={userFuncion} 
-      />
-      
-      <NavMenu 
-        open={open} 
-        items={menuItems} 
-        vistaActual={vistaActual} 
-        setVistaActual={setVistaActual} 
-        config={config} 
-      />
-      
-      <UserFooter 
-        open={open} 
-        userFuncion={userFuncion} 
-        config={config} 
-        getRoleIcon={getRoleIcon} 
-        getCargoLabel={getCargoLabel}
-        onRoleSwitched={handleRoleSwitched} 
-      />
+      {/* 🎯 SELECTOR OCULTO PARA FAMILIA Y JÓVENES */}
+      {user?.role !== ROLES.FAMILIA && user?.role !== ROLES.JOVEN && !userFuncion?.startsWith('PROTAGONISTA_') && (
+        <BranchSelector open={open} tienePermisoGlobal={!!ROLES_GESTION[userFuncion]} canChangeRama={canChangeRama} ramaSeleccionada={ramaSeleccionada} onRamaChange={onRamaChange} userFuncion={userFuncion} />
+      )}
+
+      <NavMenu open={open} items={menuItems} vistaActual={vistaActual} setVistaActual={setVistaActual} config={config} />
+      <UserFooter open={open} userFuncion={userFuncion} config={config} getRoleIcon={getRoleIcon} getCargoLabel={getCargoLabel} onRoleSwitched={handleRoleSwitched} onOpenPerfil={() => alert("Próximamente: Perfil y Firma")} />
     </Drawer>
   );
 };

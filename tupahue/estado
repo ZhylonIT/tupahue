@@ -180,3 +180,14 @@ Calibración de Diseño: Llevamos el diseño del PDF a un nivel de clon oficial 
 Integración de Datos: Sincronizamos FichaMedicaForm con el PDF para incluir campos que faltaban (CUD, Salud Mental completa, Cuadro de Vacunas Triple, etc.).
 
 Acceso del Educador: Modificamos DocumentosView para que el dirigente abra el PDF real desde el Storage y no una captura vieja, incluyendo un truco anti-caché (timestamp en la URL).
+
+Log de Modificaciones y Mejoras
+Vínculo de Identidad (Caso Máximo): Se implementó una lógica en AuthContext que detecta si un Joven tiene el user_id en NULL. El sistema ahora lo busca por DNI, repara el vínculo en la tabla scouts y le asigna su función de Protagonista en tiempo real.
+
+Unificación de Terminología: Se eliminó el término "Beneficiario" de todo el sistema. Ahora el Sidebar, el Header y el Switch de roles muestran correctamente Protagonista (ej. Protagonista Caminante).
+
+Sincronización de Colores y Cargos: Se corrigió la inversión de colores en la gestión. Ahora Programa es Azul y Comunicaciones es Naranja, vinculados directamente a la constante de verdad ROLES_GESTION.
+
+Seguridad en useDashboard: El hook ahora filtra estrictamente los datos. Un Joven solo ve su propia ficha y sus proyectos, y una Familia solo ve a sus hijos vinculados.
+
+Limpieza de UI: Se ocultó el selector de ramas para los perfiles que no lo necesitan (Familia y Protagonistas), dejando un Sidebar mucho más limpio.
