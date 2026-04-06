@@ -7,25 +7,20 @@ import { MisHijosView } from '../views/familia/MisHijosView';
 import { FinanzasView } from '../views/familia/FinanzasView';
 import { DocumentacionView } from '../views/familia/DocumentacionView';
 import { ProgresionFamiliaView } from '../views/familia/ProgresionFamiliaView';
-import { ROLES } from '../constants/auth.jsx'; // 🎯 Importante para forzar el rol
+import { PerfilView } from '../views/PerfilView'; // 🎯 Importamos Perfil Global
+import { ROLES } from '../constants/auth.jsx';
 
 export const FamiliaDashboardPage = () => {
   const { user } = useAuth();
-  
-  // 🎯 Sincronizamos con el estado del hook para evitar duplicidad
-  // Forzamos ROLES.FAMILIA para que el hook filtre por padre_id sin importar el cargo del usuario
   const state = useDashboard(user, [], [], ROLES.FAMILIA);
-
   const [hijoSeleccionadoId, setHijoSeleccionadoId] = useState(null);
 
-  // 🎯 Reparación de hijoActivo: Si no hay selección, el primero de la lista es Máximo
   const hijoActivo = useMemo(() => {   
     if (!state.scouts || state.scouts.length === 0) return null;
     const encontrado = state.scouts.find(h => h.id === hijoSeleccionadoId);
     return encontrado || state.scouts[0];   
   }, [hijoSeleccionadoId, state.scouts]);
 
-  // Si el hook está en 'DASHBOARD' (default), en familia lo tratamos como 'MIS_HIJOS'
   const vistaReal = state.vistaActual === 'DASHBOARD' ? 'MIS_HIJOS' : state.vistaActual;
 
   if (!user) return null;
@@ -33,7 +28,6 @@ export const FamiliaDashboardPage = () => {
   return (
     <Box sx={{ display: 'flex', bgcolor: '#f8f9fa', minHeight: '100vh' }}>
       <CssBaseline />
-      
       <Sidebar 
         vistaActual={vistaReal} 
         setVistaActual={state.setVistaActual} 
@@ -60,7 +54,9 @@ export const FamiliaDashboardPage = () => {
           </Box>
         ) : (
           <Box sx={{ animation: 'fadeIn 0.3s' }}>
-            {/* 🎯 Switch de Vistas Reparado */}
+            {/* 🎯 GESTIÓN DE VISTAS INCLUYENDO PERFIL */}
+            {vistaReal === 'PERFIL' && <PerfilView />}
+
             {vistaReal === 'MIS_HIJOS' && (
               <MisHijosView
                 hijosVinculados={state.scouts}
@@ -98,7 +94,6 @@ export const FamiliaDashboardPage = () => {
   );
 };
 
-// Componente auxiliar para cuando no hay datos cargados
 const NoHijoPlaceholder = () => (
   <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}>
     <Typography color="textSecondary">No se encontró información del beneficiario.</Typography>

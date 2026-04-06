@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'; // 🎯 Agregamos useState y useMemo
+import { useState, useMemo } from 'react';
 import { DashboardView } from './DashboardView';
 import { NominaView } from './nomina/NominaView';
 import { ProgresionView } from './progresion/ProgresionView';
@@ -11,6 +11,7 @@ import { CuotasView } from './finanzas/CuotasView';
 import { PresupuestoView } from './finanzas/PresupuestoView'; 
 import { AdultosView } from './adultos/AdultosView';
 import { RevisionProyectosView } from './proyectos/RevisionProyectosView';
+import { PerfilView } from '../PerfilView';
 import { Box } from '@mui/material';
 
 // Vistas de Familia
@@ -32,20 +33,17 @@ export const EducadorMainView = ({
   proyectos = [], 
   handlers,
   userFuncion,
-  user // 🎯 Recibimos el user para tener el ID del padre
+  user 
 }) => {
   
-  // 🎯 ESTADO PARA GESTIONAR EL HIJO SELECCIONADO EN MODO FAMILIA
   const [hijoSeleccionadoId, setHijoSeleccionadoId] = useState(null);
 
-  // Derivamos el hijo activo de la lista de scouts (que en modo familia ya vienen filtrados por padre_id)
   const hijoActivo = useMemo(() => {
     if (userFuncion !== ROLES.FAMILIA || !scouts || scouts.length === 0) return null;
     const encontrado = scouts.find(h => h.id === hijoSeleccionadoId);
-    return encontrado || scouts[0]; // Por defecto toma al primero (Máximo)
+    return encontrado || scouts[0]; 
   }, [hijoSeleccionadoId, scouts, userFuncion]);
 
-  // 🎯 FILTRADO RIGUROSO POR RAMA (Para vista de Educador)
   const scoutsFiltrados = scouts?.filter(s => {
     if (ramaActiva === 'TODAS') return true;
     const ramaScout = s.rama || ""; 
@@ -60,8 +58,10 @@ export const EducadorMainView = ({
   const esVistaGlobal = ramaActiva === 'TODAS';
 
   switch (vistaActual) {
+    case 'PERFIL': // 🎯 NUEVO CASO
+      return <PerfilView />;
+
     case 'DASHBOARD': 
-      // 🎯 Reparación: Si el educador cambia a "Familia", el dashboard es "Mis Hijos"
       if (userFuncion === ROLES.FAMILIA) {
         return (
           <MisHijosView 
@@ -69,7 +69,7 @@ export const EducadorMainView = ({
             onVincular={(dni) => handlers.handleVincularHijo(dni, user.id)}
             onSelectHijo={(hijo) => {
               setHijoSeleccionadoId(hijo.id);
-              setVistaActual('FINANZAS'); // Navegación automática al seleccionar
+              setVistaActual('FINANZAS');
             }}
           />
         );
@@ -97,9 +97,8 @@ export const EducadorMainView = ({
       );
     
     case 'DOCUMENTACION':
-      // 🎯 Reparación: Pasamos el hijo activo
       if (userFuncion === ROLES.FAMILIA) return <DocumentacionFamiliaView hijo={hijoActivo} />;
-      return <Box>Vista no disponible para este cargo.</Box>;
+      return <Box>Vista de Documentos Educador</Box>;
     
     case 'NOMINA': 
     case 'NOMINA_GLOBAL': 
@@ -116,7 +115,6 @@ export const EducadorMainView = ({
       );
 
     case 'PROGRESION':
-      // 🎯 Reparación: Pasamos el hijo activo a la vista de familia
       if (userFuncion === ROLES.FAMILIA) return <ProgresionFamiliaView hijo={hijoActivo} />;
       return (
         <ProgresionView 
@@ -171,7 +169,6 @@ export const EducadorMainView = ({
       return <NoticiasView {...commonProps} />;
 
     case 'FINANZAS':
-      // 🎯 Reparación: Pasamos el hijo activo a la vista de familia
       if (userFuncion === ROLES.FAMILIA) return <FinanzasFamiliaView hijo={hijoActivo} />;
       return <FinanzasView scouts={scouts} {...commonProps} />;
 

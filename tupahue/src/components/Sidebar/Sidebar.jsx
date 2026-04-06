@@ -14,15 +14,12 @@ import { BranchSelector } from './BranchSelector';
 import { NavMenu } from './NavMenu';
 import { UserFooter } from './UserFooter';
 import { useAuth } from '../../context/AuthContext';
-import { FirmaDigitalModal } from '../FirmaDigitalModal'; 
-import { supabase } from '../../lib/supabaseClient';
 
 const drawerWidth = 280;
 
 export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaActual, canChangeRama }) => {
   const { user, userFuncion } = useAuth();
   const [open, setOpen] = useState(true);
-  const [isPerfilOpen, setIsPerfilOpen] = useState(false); 
 
   const config = useMemo(() => {
     const mapa = {
@@ -140,7 +137,6 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
   }, [userFuncion]);
 
   const handleRoleSwitched = (nuevaFuncion) => {
-    // 🎯 Mapeo explícito para que los cargos globales pongan la rama en TODAS
     const cargosGlobales = [
       FUNCIONES.JEFE_GRUPO, 
       FUNCIONES.ASISTENTE_PROG, 
@@ -158,56 +154,36 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
     setVistaActual(nuevaFuncion === ROLES.FAMILIA ? 'MIS_HIJOS' : 'DASHBOARD');
   };
 
-  const handleSaveFirma = async (datosFirma) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          firma_url: datosFirma.firmaImg
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-      alert("¡Firma digital configurada con éxito!");
-      setIsPerfilOpen(false);
-      window.location.reload(); 
-    } catch (e) {
-      console.error(e);
-      alert("Error al guardar la firma.");
-    }
-  };
-
   return (
-    <>
-      <Drawer variant="permanent" sx={{ width: open ? drawerWidth : 70, transition: 'width 0.3s', '& .MuiDrawer-paper': { width: open ? drawerWidth : 70, overflowX: 'hidden', bgcolor: '#121212', color: 'white', borderRight: 'none', boxShadow: '10px 0 30px rgba(0,0,0,0.5)' } }}>
-        <SidebarHeader open={open} user={user} config={config} getCargoLabel={getCargoLabel} userFuncion={userFuncion} />
-        
-        {userFuncion !== ROLES.FAMILIA && !userFuncion?.startsWith('PROTAGONISTA_') && (
-          <BranchSelector 
-            open={open} 
-            tienePermisoGlobal={[FUNCIONES.JEFE_GRUPO, FUNCIONES.ASISTENTE_PROG, FUNCIONES.ASISTENTE_ADM, FUNCIONES.ASISTENTE_COM, FUNCIONES.ASISTENTE_ADULTOS].includes(userFuncion)} 
-            canChangeRama={canChangeRama} 
-            ramaSeleccionada={ramaSeleccionada} 
-            onRamaChange={onRamaChange} 
-            userFuncion={userFuncion} 
-          />
-        )}
-
-        <NavMenu open={open} items={menuItems} vistaActual={vistaActual} setVistaActual={setVistaActual} config={config} />
-        <UserFooter 
-          open={open} userFuncion={userFuncion} config={config} 
-          getRoleIcon={getRoleIcon} getCargoLabel={getCargoLabel} 
-          onRoleSwitched={handleRoleSwitched} 
-          onOpenPerfil={() => setIsPerfilOpen(true)} 
+    <Drawer 
+      variant="permanent" 
+      sx={{ 
+        width: open ? drawerWidth : 70, 
+        transition: 'width 0.3s', 
+        '& .MuiDrawer-paper': { width: open ? drawerWidth : 70, overflowX: 'hidden', bgcolor: '#121212', color: 'white', borderRight: 'none', boxShadow: '10px 0 30px rgba(0,0,0,0.5)' } 
+      }}
+    >
+      <SidebarHeader open={open} user={user} config={config} getCargoLabel={getCargoLabel} userFuncion={userFuncion} />
+      
+      {userFuncion !== ROLES.FAMILIA && !userFuncion?.startsWith('PROTAGONISTA_') && (
+        <BranchSelector 
+          open={open} 
+          tienePermisoGlobal={[FUNCIONES.JEFE_GRUPO, FUNCIONES.ASISTENTE_PROG, FUNCIONES.ASISTENTE_ADM, FUNCIONES.ASISTENTE_COM, FUNCIONES.ASISTENTE_ADULTOS].includes(userFuncion)} 
+          canChangeRama={canChangeRama} 
+          ramaSeleccionada={ramaSeleccionada} 
+          onRamaChange={onRamaChange} 
+          userFuncion={userFuncion} 
         />
-      </Drawer>
+      )}
 
-      <FirmaDigitalModal 
-        open={isPerfilOpen} 
-        onClose={() => setIsPerfilOpen(false)}
-        user={user}
-        onConfirm={handleSaveFirma}
+      <NavMenu open={open} items={menuItems} vistaActual={vistaActual} setVistaActual={setVistaActual} config={config} />
+      
+      <UserFooter 
+        open={open} userFuncion={userFuncion} config={config} 
+        getRoleIcon={getRoleIcon} getCargoLabel={getCargoLabel} 
+        onRoleSwitched={handleRoleSwitched} 
+        onOpenPerfil={() => setVistaActual('PERFIL')} // 🎯 Llama a la vista, no al modal
       />
-    </>
+    </Drawer>
   );
 };

@@ -23,12 +23,10 @@ export const AuthProvider = ({ children }) => {
       if (profileData) {
         let fPermitidas = profileData.funciones || [];
         
-        // 🎯 SI EL ROL BASE ES FAMILIA, ASEGURAMOS QUE ESTÉ EN LAS FUNCIONES
         if (profileData.role === ROLES.FAMILIA && !fPermitidas.includes(ROLES.FAMILIA)) {
           fPermitidas.push(ROLES.FAMILIA);
         }
 
-        // 🎯 MOTOR DE AUTOREPARACIÓN (CASO MÁXIMO / JÓVENES)
         if (profileData.role === ROLES.JOVEN) {
           let { data: scoutData } = await supabase
             .from('scouts')
@@ -57,8 +55,6 @@ export const AuthProvider = ({ children }) => {
             }
           }
         } 
-        
-        // 🎯 SI ES JEFE DE GRUPO, TIENE TODAS LAS DE GESTIÓN (MANTIENE FAMILIA SI LA TENÍA)
         else if (fPermitidas.includes(FUNCIONES.JEFE_GRUPO)) {
           const tieneFamilia = fPermitidas.includes(ROLES.FAMILIA);
           fPermitidas = Object.values(FUNCIONES).filter(f => !f.startsWith('PROTAGONISTA_'));
@@ -69,11 +65,7 @@ export const AuthProvider = ({ children }) => {
         setAvailableFunciones(fPermitidas);
         
         const saved = localStorage.getItem('user_tupahue_funcion');
-        // Prioridad: 1. Función guardada si es válida, 2. Función 0 (Educador), 3. Familia
-        const funcionFinal = (saved && fPermitidas.includes(saved)) 
-          ? saved 
-          : fPermitidas[0];
-
+        const funcionFinal = (saved && fPermitidas.includes(saved)) ? saved : fPermitidas[0];
         setUserFuncion(funcionFinal);
       }
     } catch (e) { 
@@ -82,6 +74,36 @@ export const AuthProvider = ({ children }) => {
       setAuthLoading(false); 
     }
   }, []);
+
+  const updateProfile = async (updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      setUser(prev => ({ ...prev, ...data }));
+      return data;
+    } catch (e) {
+      console.error("Update Profile Error:", e.message);
+      throw e;
+    }
+  };
+
+  // 🎯 GESTIÓN DE SEGURIDAD (EMAIL Y PASSWORD)
+  const updateEmail = async (newEmail) => {
+    const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) throw error;
+    return data;
+  };
+
+  const updatePassword = async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
 
   useEffect(() => {
     const check = async () => {
@@ -112,7 +134,6 @@ export const AuthProvider = ({ children }) => {
     setAuthLoading(true);
     try {
       let record = null;
-      // Verificamos si ya existe el perfil por DNI (Caso Educador pre-cargado)
       const { data: existingProfile } = await supabase.from('profiles').select('*').eq('dni', dni).maybeSingle();
       
       if (roleSolicitado === ROLES.JOVEN) {
@@ -125,7 +146,6 @@ export const AuthProvider = ({ children }) => {
       if (authError) throw authError;
       const uid = authData.user.id;
 
-      // Unificamos funciones: lo que ya tenía + lo nuevo
       let fFinales = existingProfile?.funciones || [];
       if (roleSolicitado === ROLES.JOVEN && record) {
         fFinales.push(`PROTAGONISTA_${record.rama.toUpperCase()}`);
@@ -144,13 +164,11 @@ export const AuthProvider = ({ children }) => {
         funciones: [...new Set(fFinales)]
       };
 
-      // Si existía un perfil temporal (sin ID de Auth), lo limpiamos antes del upsert
       if (existingProfile && existingProfile.id !== uid) {
         await supabase.from('profiles').delete().eq('id', existingProfile.id);
       }
 
       await supabase.from('profiles').upsert([perfil]);
-      
       if (roleSolicitado === ROLES.JOVEN) await supabase.from('scouts').update({ user_id: uid }).eq('dni', dni);
       if (hijosDnis.length > 0) await supabase.from('scouts').update({ padre_id: uid }).in('dni', hijosDnis);
 
@@ -161,7 +179,16 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => { setAuthLoading(true); await supabase.auth.signOut(); };
   const switchRole = (f) => { setUserFuncion(f); localStorage.setItem('user_tupahue_funcion', f); };
 
-  return <AuthContext.Provider value={{ user, userFuncion, availableFunciones, login, register, logout, switchRole, authLoading }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ 
+      user, userFuncion, availableFunciones, 
+      login, register, logout, switchRole, 
+      updateProfile, updateEmail, updatePassword, // 🎯 Exportamos todo
+      authLoading 
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);

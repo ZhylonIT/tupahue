@@ -10,6 +10,7 @@ import { MiRamaView } from '../views/joven/MiRamaView';
 import { MisFinanzasJovenView } from '../views/joven/MisFinanzasJovenView';
 import { MisProyectosView } from '../views/joven/MisProyectosView';
 import { DocumentacionView } from '../views/familia/DocumentacionView'; 
+import { PerfilView } from '../views/PerfilView'; // 🎯 Importamos el Perfil Global
 
 const DRAWER_WIDTH = 280;
 
@@ -24,21 +25,13 @@ export const JovenDashboardPage = () => {
 
   const state = useDashboard(user, [], [], userFuncion);
 
-  // 🎯 Buscamos al beneficiario vinculado
   const yo = useMemo(() => {
     if (!state.scouts || state.scouts.length === 0) return null;
-    
-    // 1. Simulación para Administradores
     if (isDevMode && devSelectedDni) {
       return state.scouts.find(s => String(s.dni) === String(devSelectedDni));
     }
-
-    // 2. Producción: El pibe ve su propia ficha real (ya filtrada por user_id en el hook)
     const encontrado = state.scouts.find(s => s.user_id === user?.id);
-    
-    // Fallback para admin si no seleccionó nadie en el simulador
     if (isDevMode && !encontrado) return state.scouts[0];
-    
     return encontrado;
   }, [state.scouts, user?.id, isDevMode, devSelectedDni]);
 
@@ -70,7 +63,7 @@ export const JovenDashboardPage = () => {
         
         {state.loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>
-        ) : !yo && !isDevMode ? (
+        ) : !yo && !isDevMode && vistaActual !== 'PERFIL' ? ( // 🎯 Permitimos perfil aunque no haya ficha
           <Container maxWidth="md">
             <Alert severity="warning" sx={{ borderRadius: 4, fontWeight: 700, mt: 4 }}>
               Tu usuario no está vinculado a una ficha de beneficiario activa.
@@ -78,6 +71,9 @@ export const JovenDashboardPage = () => {
           </Container>
         ) : (
           <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
+            {/* 🎯 GESTIÓN DE VISTAS INCLUYENDO PERFIL */}
+            {vistaActual === 'PERFIL' && <PerfilView />}
+            
             {vistaActual === 'MI_RAMA' && <MiRamaView joven={yo} eventos={state.eventos} proyectos={state.proyectos} />}
             {vistaActual === 'PROGRESION' && <MiProgresionView joven={yo} />}            
             {vistaActual === 'PROYECTOS' && (
