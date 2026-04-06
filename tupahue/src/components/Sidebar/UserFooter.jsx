@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Box, Stack, Tooltip, Avatar, Typography, Menu, MenuItem, ListItemIcon, Divider, IconButton } from '@mui/material';
-import { Settings, ExitToApp, CheckCircle, HistoryEdu } from '@mui/icons-material';
+import { Box, Stack, Tooltip, Avatar, Typography, Menu, MenuItem, ListItemIcon, IconButton } from '@mui/material';
+import { ExitToApp, CheckCircle, HistoryEdu } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 
 export const UserFooter = ({ open, userFuncion, config, getRoleIcon, getCargoLabel, onRoleSwitched, onOpenPerfil }) => {
-  const { user, logout, switchRole, availableFunciones } = useAuth();
+  const { logout, switchRole, availableFunciones } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const openMenu = Boolean(anchorEl);
 

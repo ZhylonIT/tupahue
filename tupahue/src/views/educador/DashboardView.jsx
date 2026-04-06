@@ -7,9 +7,9 @@ import {
   TrendingUp, Group, FactCheck, RocketLaunch,
   Event as EventIcon, Public, Assignment,
   AccountBalanceWallet, Payments, School, WorkspacePremium, 
-  WarningAmber, ChevronLeft, ChevronRight, LocationOn
+  WarningAmber, ChevronLeft, ChevronRight, LocationOn, Campaign
 } from '@mui/icons-material';
-import { RAMAS } from '../../constants/ramas';
+import { RAMAS, ROLES_GESTION } from '../../constants/ramas';
 import { FUNCIONES } from '../../constants/auth';
 import { useFinanzas } from '../../hooks/useFinanzas';
 import { useAdultos } from '../../hooks/useAdultos';
@@ -42,8 +42,8 @@ const StatCard = ({ title, value, icon, color, subtitle, onClick }) => (
 export const DashboardView = ({ 
   scouts = [], 
   eventos = [], 
-  proyectos = [], // 👈 Prop agregada
-  ramaId = 'CAMINANTES', 
+  proyectos = [], 
+  ramaId = 'TODAS', 
   userFuncion, 
   setVistaActual 
 }) => {
@@ -52,14 +52,22 @@ export const DashboardView = ({
   
   const [currentEventIdx, setCurrentEventIdx] = useState(0);
 
-  const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS';
-  const idBusqueda = ramaId?.toUpperCase();
-  const CONFIG_RAMA = esVistaGlobal 
-    ? { nombre: 'Todo el Grupo', color: VIOLETA_SCOUT } 
-    : (RAMAS[idBusqueda] || RAMAS.CAMINANTES);
-
+  // 🎯 LÓGICA DE ROLES PARA IDENTIDAD VISUAL
   const esAdmin = userFuncion === FUNCIONES.JEFE_GRUPO || userFuncion === FUNCIONES.ASISTENTE_ADM;
   const esAGA = userFuncion === FUNCIONES.ASISTENTE_ADULTOS;
+  const esCI = userFuncion === FUNCIONES.ASISTENTE_COM;
+
+  // Si es un cargo global, forzamos vista global aunque venga un ramaId residual
+  const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS' || esAdmin || esAGA || esCI;
+  const idBusqueda = ramaId?.toUpperCase();
+  
+  const CONFIG_RAMA = useMemo(() => {
+    if (esAGA) return { nombre: 'Gestión de Adultos', color: '#D32F2F' };
+    if (esCI) return { nombre: 'Comunicación Institucional', color: '#F57C00' };
+    if (esAdmin) return { nombre: 'Gestión Administrativa', color: '#388E3C' };
+    if (esVistaGlobal) return { nombre: 'Todo el Grupo', color: VIOLETA_SCOUT };
+    return (RAMAS[idBusqueda] || RAMAS.SCOUTS);
+  }, [esAGA, esCI, esAdmin, esVistaGlobal, idBusqueda]);
 
   // --- LÓGICA DE PROYECTOS PENDIENTES ---
   const proyectosPendientes = useMemo(() => {
@@ -107,12 +115,13 @@ export const DashboardView = ({
     <Box sx={{ animation: 'fadeIn 0.5s ease-out' }}>
       <Box sx={{ mb: 4 }}>
         <Stack direction="row" spacing={2} alignItems="center">
-          {esAGA ? <WorkspacePremium sx={{ fontSize: 40, color: '#c0392b' }} />
+          {esAGA ? <WorkspacePremium sx={{ fontSize: 40, color: CONFIG_RAMA.color }} />
+          : esCI ? <Campaign sx={{ fontSize: 40, color: CONFIG_RAMA.color }} />
           : esVistaGlobal ? <Public sx={{ fontSize: 40, color: CONFIG_RAMA.color }} /> 
           : <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: CONFIG_RAMA.color }} />}
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 900 }}>
-              {esAGA ? 'Gestión de Adultos' : esAdmin ? 'Panel de Gestión' : '¡Siempre Listo!'}
+              {CONFIG_RAMA.nombre}
             </Typography>
             <Typography variant="body1" color="text.secondary">
               {esVistaGlobal ? 'Resumen General • Grupo Scout Tupahue' : `Panel de control • ${CONFIG_RAMA.nombre}`}
@@ -122,21 +131,12 @@ export const DashboardView = ({
       </Box>
 
       <Grid container spacing={3}>
-        
-        {/* 🚨 ALERTA DE PROYECTOS PENDIENTES (Solo si hay) */}
         {proyectosPendientes > 0 && (
           <Grid item xs={12}>
             <Alert 
-              severity="warning" 
-              variant="filled"
-              icon={<RocketLaunch />}
+              severity="warning" variant="filled" icon={<RocketLaunch />}
               action={
-                <Button 
-                  color="inherit" 
-                  size="small" 
-                  sx={{ fontWeight: 900 }}
-                  onClick={() => setVistaActual('REVISION_PROYECTOS')}
-                >
+                <Button color="inherit" size="small" sx={{ fontWeight: 900 }} onClick={() => setVistaActual('REVISION_PROYECTOS')}>
                   REVISAR AHORA
                 </Button>
               }
@@ -147,12 +147,12 @@ export const DashboardView = ({
           </Grid>
         )}
 
-        {/* CARDS DINÁMICAS */}
+        {/* 🎯 SECCIÓN DE CARDS PERSONALIZADAS POR FUNCIÓN */}
         <Grid item xs={12} sm={6} md={3}>
           <StatCard 
             title={esAGA ? "Consejo de Grupo" : "Beneficiarios"} 
             value={esAGA ? statsAdultos.total : totalScouts} 
-            icon={<Group />} color={esAGA ? "#c0392b" : CONFIG_RAMA.color}
+            icon={<Group />} color={CONFIG_RAMA.color}
             subtitle={esAGA ? "Educadores en nómina" : "Activos actualmente"} 
             onClick={() => setVistaActual(esAGA ? 'ADULTOS' : 'NOMINA')}
           />
@@ -161,6 +161,8 @@ export const DashboardView = ({
         <Grid item xs={12} sm={6} md={3}>
           {esAdmin ? (
             <StatCard title="Saldo en Caja" value={`$${statsFinancieras.saldo.toLocaleString()}`} icon={<AccountBalanceWallet />} color="#2e7d32" subtitle="Disponible real" onClick={() => setVistaActual('FINANZAS')} />
+          ) : esCI ? (
+            <StatCard title="Noticias Activas" value="12" icon={<Campaign />} color="#F57C00" subtitle="Publicadas este mes" onClick={() => setVistaActual('NOTICIAS')} />
           ) : (
             <StatCard title={esAGA ? "Formación" : "Asistencia"} value={esAGA ? `${statsAdultos.promedio}%` : scouts.filter(s => s.presente).length} icon={esAGA ? <School /> : <TrendingUp />} color={esAGA ? "#2980b9" : "#1976d2"} subtitle={esAGA ? "Avance SNF" : "Presentes hoy"} onClick={() => setVistaActual(esAGA ? 'ADULTOS' : 'NOMINA')} />
           )}
@@ -169,6 +171,8 @@ export const DashboardView = ({
         <Grid item xs={12} sm={6} md={3}>
           {esAdmin ? (
             <StatCard title={`Cuotas ${statsFinancieras.nomMes}`} value={`${statsFinancieras.pagaronCuota}/${totalScouts}`} icon={<Payments />} color={VIOLETA_SCOUT} subtitle="Cobranza del mes" onClick={() => setVistaActual('CUOTAS')} />
+          ) : esCI ? (
+            <StatCard title="Difusión" value="85%" icon={<Public />} color="#F57C00" subtitle="Alcance de comunicados" onClick={() => setVistaActual('NOTICIAS')} />
           ) : (
             <StatCard title={esAGA ? "Alertas SNF" : "Fichas Médicas"} value={esAGA ? statsAdultos.alertas : `${conFicha}/${totalScouts}`} icon={esAGA ? <WarningAmber /> : <FactCheck />} color={esAGA ? "#e67e22" : "#2e7d32"} subtitle={esAGA ? "Nivel inicial s/avances" : "Documentación al día"} onClick={() => setVistaActual(esAGA ? 'ADULTOS' : 'DOCUMENTOS')} />
           )}
@@ -178,7 +182,6 @@ export const DashboardView = ({
             <StatCard title="Eventos Activos" value={eventos.length} icon={<EventIcon />} color="#757575" subtitle="En el calendario" onClick={() => setVistaActual('CALENDARIO')} />
         </Grid>
 
-        {/* GRÁFICOS REALES */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee', boxShadow: 'none' }}>
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 3 }}>
@@ -205,7 +208,7 @@ export const DashboardView = ({
                 conteoPorRama.map((r) => (
                   <Box key={r.id}>
                     <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                      <Typography variant="body2" component="div" sx={{ fontWeight: 700, display: 'center', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" component="div" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: r.color }} /> {r.nombre}
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>{r.cantidad} beneficiarios</Typography>
@@ -218,7 +221,6 @@ export const DashboardView = ({
           </Paper>
         </Grid>
 
-        {/* CARRUSEL DE AGENDA REAL */}
         <Grid item xs={12} md={4}>
           <Card 
             sx={{ 
@@ -241,7 +243,6 @@ export const DashboardView = ({
                   </Stack>
                 )}
               </Stack>
-
               {proximoEvento ? (
                 <Box key={proximoEvento.id} sx={{ animation: 'slideIn 0.3s ease-out' }}>
                   <Typography variant="h5" sx={{ fontWeight: 900, mb: 2 }}>{proximoEvento.titulo}</Typography>
@@ -249,21 +250,16 @@ export const DashboardView = ({
                     <Stack direction="row" spacing={1} alignItems="center"><EventIcon fontSize="small" /><Typography variant="body2">{proximoEvento.fecha}</Typography></Stack>
                     <Stack direction="row" spacing={1} alignItems="center"><LocationOn fontSize="small" /><Typography variant="body2">{proximoEvento.lugar || 'Sede Grupo'}</Typography></Stack>
                     <Divider sx={{ bgcolor: 'rgba(255,255,255,0.2)', my: 1 }} />
-                    <Typography variant="body2" sx={{ opacity: 0.9, fontStyle: 'italic' }}>{proximoEvento.descripcion || 'Sin detalles adicionales.'}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9, fontStyle: 'italic' }}>{proximoEvento.descripcion || 'Sin detalles.'}</Typography>
                   </Stack>
                 </Box>
               ) : (
                 <Stack alignItems="center" justifyContent="center" sx={{ mt: 4, textAlign: 'center' }}>
                   <EventIcon sx={{ fontSize: 40, mb: 1, opacity: 0.3 }} />
-                  <Typography variant="body2">No hay eventos registrados.</Typography>
+                  <Typography variant="body2">No hay eventos.</Typography>
                 </Stack>
               )}
             </CardContent>
-            {proximoEvento && (
-              <Box sx={{ p: 2 }}>
-                <Button fullWidth variant="contained" size="small" onClick={() => setVistaActual('CALENDARIO')} sx={{ bgcolor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)' }}>Ver Todo el Calendario</Button>
-              </Box>
-            )}
           </Card>
         </Grid>
       </Grid>

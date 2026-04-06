@@ -17,7 +17,6 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
   const [scoutSeleccionado, setScoutSeleccionado] = useState(null);
 
   const fetchData = useCallback(async () => {
-    // Si no hay user, no hay consulta.
     if (!user?.id) {
         setLoading(false);
         return;
@@ -28,10 +27,10 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
       let qScouts = supabase.from('scouts').select('*');
       let qProy = supabase.from('proyectos').select('*');
 
-      if (user.role === ROLES.FAMILIA) {
+      // 🎯 FILTRADO DINÁMICO SEGÚN LA FUNCIÓN ACTIVA
+      if (funcionActual === ROLES.FAMILIA) {
         qScouts = qScouts.eq('padre_id', user.id);
-      } else if (user.role === ROLES.JOVEN) {
-        // Buscamos estrictamente lo que nos pertenece
+      } else if (funcionActual?.startsWith('PROTAGONISTA_')) {
         qScouts = qScouts.eq('user_id', user.id);
         qProy = qProy.eq('creadoPor', user.id);
       }
@@ -40,7 +39,7 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
         qScouts,
         supabase.from('eventos').select('*').order('fecha', { ascending: true }),
         qProy,
-        supabase.from('profiles').select('nombre, apellido, role').or('role.eq.EDUCADOR,role.eq.ADMIN')
+        supabase.from('profiles').select('*').or(`role.eq.${ROLES.EDUCADOR},role.eq.ADMIN`)
       ]);
 
       setScouts(resScouts.data || []);
@@ -52,7 +51,8 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
     } finally { 
       setLoading(false); 
     }
-  }, [user?.id, user?.role]); // Solo re-ejecutar si el ID o Rol cambian
+    // 🎯 RE-EJECUTAR SI CAMBIA LA FUNCIÓN (SWITCH DE ROL)
+  }, [user?.id, user?.role, funcionActual]); 
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -23,18 +23,20 @@ export const AuthProvider = ({ children }) => {
       if (profileData) {
         let fPermitidas = profileData.funciones || [];
         
-        // 🎯 MOTOR DE AUTOREPARACIÓN ULTRA-AGRESIVO (CASO MÁXIMO)
+        // 🎯 SI EL ROL BASE ES FAMILIA, ASEGURAMOS QUE ESTÉ EN LAS FUNCIONES
+        if (profileData.role === ROLES.FAMILIA && !fPermitidas.includes(ROLES.FAMILIA)) {
+          fPermitidas.push(ROLES.FAMILIA);
+        }
+
+        // 🎯 MOTOR DE AUTOREPARACIÓN (CASO MÁXIMO / JÓVENES)
         if (profileData.role === ROLES.JOVEN) {
-          // 1. Intentamos buscar por user_id (lo normal)
           let { data: scoutData } = await supabase
             .from('scouts')
             .select('rama, user_id, dni')
             .eq('user_id', userId)
             .maybeSingle();
 
-          // 2. 🚨 SI ES NULL (Caso Máximo), buscamos por DNI para reparar el vínculo
           if (!scoutData && profileData.dni) {
-            console.log("Detectado vínculo roto por user_id NULL. Intentando reparar por DNI...");
             const { data: repairData } = await supabase
               .from('scouts')
               .select('rama, user_id, dni')
@@ -42,33 +44,35 @@ export const AuthProvider = ({ children }) => {
               .maybeSingle();
             
             if (repairData) {
-              // Encontramos la ficha huérfana, le asignamos el user_id de este usuario
               await supabase.from('scouts').update({ user_id: userId }).eq('dni', profileData.dni);
               scoutData = repairData;
-              console.log("¡Vínculo reparado con éxito para el DNI:", profileData.dni);
             }
           }
 
           if (scoutData) {
             const ramaRealFunc = `PROTAGONISTA_${scoutData.rama.toUpperCase()}`;
-            
-            // Forzamos la función correcta según su rama real
             if (!fPermitidas.includes(ramaRealFunc)) {
               fPermitidas = [ramaRealFunc];
               await supabase.from('profiles').update({ funciones: fPermitidas }).eq('id', userId);
             }
           }
-        } else if (fPermitidas.includes(FUNCIONES.JEFE_GRUPO)) {
+        } 
+        
+        // 🎯 SI ES JEFE DE GRUPO, TIENE TODAS LAS DE GESTIÓN (MANTIENE FAMILIA SI LA TENÍA)
+        else if (fPermitidas.includes(FUNCIONES.JEFE_GRUPO)) {
+          const tieneFamilia = fPermitidas.includes(ROLES.FAMILIA);
           fPermitidas = Object.values(FUNCIONES).filter(f => !f.startsWith('PROTAGONISTA_'));
+          if (tieneFamilia && !fPermitidas.includes(ROLES.FAMILIA)) fPermitidas.push(ROLES.FAMILIA);
         }
 
         setUser({ ...profileData, funciones: fPermitidas });
         setAvailableFunciones(fPermitidas);
         
         const saved = localStorage.getItem('user_tupahue_funcion');
-        const funcionFinal = (profileData.role === ROLES.JOVEN) 
-          ? fPermitidas[0] 
-          : (saved && fPermitidas.includes(saved) ? saved : fPermitidas[0]);
+        // Prioridad: 1. Función guardada si es válida, 2. Función 0 (Educador), 3. Familia
+        const funcionFinal = (saved && fPermitidas.includes(saved)) 
+          ? saved 
+          : fPermitidas[0];
 
         setUserFuncion(funcionFinal);
       }
@@ -108,12 +112,12 @@ export const AuthProvider = ({ children }) => {
     setAuthLoading(true);
     try {
       let record = null;
+      // Verificamos si ya existe el perfil por DNI (Caso Educador pre-cargado)
+      const { data: existingProfile } = await supabase.from('profiles').select('*').eq('dni', dni).maybeSingle();
+      
       if (roleSolicitado === ROLES.JOVEN) {
         const { data } = await supabase.from('scouts').select('*').eq('dni', dni).maybeSingle();
         if (!data) throw new Error("DNI no está en nómina.");
-        record = data;
-      } else if (roleSolicitado === ROLES.EDUCADOR) {
-        const { data } = await supabase.from('profiles').select('*').eq('dni', dni).maybeSingle();
         record = data;
       }
 
@@ -121,19 +125,32 @@ export const AuthProvider = ({ children }) => {
       if (authError) throw authError;
       const uid = authData.user.id;
 
-      let fIniciales = [roleSolicitado];
-      if (roleSolicitado === ROLES.JOVEN && record) fIniciales = [`PROTAGONISTA_${record.rama.toUpperCase()}`];
+      // Unificamos funciones: lo que ya tenía + lo nuevo
+      let fFinales = existingProfile?.funciones || [];
+      if (roleSolicitado === ROLES.JOVEN && record) {
+        fFinales.push(`PROTAGONISTA_${record.rama.toUpperCase()}`);
+      } else if (roleSolicitado === ROLES.FAMILIA || hijosDnis.length > 0) {
+        fFinales.push(ROLES.FAMILIA);
+      } else {
+        fFinales.push(roleSolicitado);
+      }
 
       const perfil = {
-        id: uid, dni, nombre: record?.nombre || nombre, apellido: record?.apellido || apellido,
-        role: record?.role || roleSolicitado,
-        funciones: (roleSolicitado === ROLES.FAMILIA || hijosDnis.length > 0) ? [...new Set([...(record?.funciones || []), ROLES.FAMILIA])] : fIniciales
+        id: uid, 
+        dni, 
+        nombre: nombre || existingProfile?.nombre || record?.nombre, 
+        apellido: apellido || existingProfile?.apellido || record?.apellido,
+        role: existingProfile?.role || roleSolicitado,
+        funciones: [...new Set(fFinales)]
       };
 
-      if (roleSolicitado === ROLES.EDUCADOR) await supabase.from('profiles').delete().eq('dni', dni);
+      // Si existía un perfil temporal (sin ID de Auth), lo limpiamos antes del upsert
+      if (existingProfile && existingProfile.id !== uid) {
+        await supabase.from('profiles').delete().eq('id', existingProfile.id);
+      }
+
       await supabase.from('profiles').upsert([perfil]);
       
-      // Intentamos el vínculo inicial
       if (roleSolicitado === ROLES.JOVEN) await supabase.from('scouts').update({ user_id: uid }).eq('dni', dni);
       if (hijosDnis.length > 0) await supabase.from('scouts').update({ padre_id: uid }).in('dni', hijosDnis);
 

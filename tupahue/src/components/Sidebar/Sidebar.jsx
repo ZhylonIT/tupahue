@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { Drawer, Box } from '@mui/material';
+import { Drawer } from '@mui/material';
 import { 
   Dashboard, People, BarChart, Event, FolderShared, AccountBalanceWallet, 
-  Campaign, AdminPanelSettings, Engineering, School, Assignment, Payments, 
-  AccountBalance, WorkspacePremium, RocketLaunch, FamilyRestroom, ReceiptLong, TrendingUp, Groups, EmojiEvents, Description
+  Campaign, AdminPanelSettings, Engineering, School, Assignment, RocketLaunch, 
+  FamilyRestroom, ReceiptLong, TrendingUp, Groups, EmojiEvents, Description,
+  Payments, AccountBalance
 } from '@mui/icons-material';
 
 import { RAMAS, ROLES_GESTION } from '../../constants/ramas';
@@ -13,16 +14,18 @@ import { BranchSelector } from './BranchSelector';
 import { NavMenu } from './NavMenu';
 import { UserFooter } from './UserFooter';
 import { useAuth } from '../../context/AuthContext';
+import { FirmaDigitalModal } from '../FirmaDigitalModal'; 
+import { supabase } from '../../lib/supabaseClient';
 
 const drawerWidth = 280;
 
 export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaActual, canChangeRama }) => {
   const { user, userFuncion } = useAuth();
   const [open, setOpen] = useState(true);
+  const [isPerfilOpen, setIsPerfilOpen] = useState(false); 
 
-  // 🎯 MAPEADO DE COLORES DESDE CONSTANTES REALES
   const config = useMemo(() => {
-    const mapaColores = {
+    const mapa = {
       [FUNCIONES.JEFE_GRUPO]: ROLES_GESTION.JEFE_GRUPO.color,
       [FUNCIONES.ASISTENTE_PROG]: ROLES_GESTION.PROGRAMA.color,
       [FUNCIONES.ASISTENTE_ADM]: ROLES_GESTION.FINANZAS.color,
@@ -30,29 +33,29 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
       [FUNCIONES.ASISTENTE_ADULTOS]: ROLES_GESTION.ADULTOS.color,
     };
 
-    if (mapaColores[userFuncion]) {
-      return { color: mapaColores[userFuncion], fondo: `${mapaColores[userFuncion]}22` };
+    if (mapa[userFuncion]) {
+      return { color: mapa[userFuncion], fondo: `${mapa[userFuncion]}22` };
     }
 
-    if (user?.role === ROLES.FAMILIA) {
+    if (userFuncion === ROLES.FAMILIA) {
       return { color: '#9d4edd', fondo: 'rgba(157, 78, 221, 0.15)' };
     }
 
     const ramaKey = userFuncion?.replace('PROTAGONISTA_', '') || 'SCOUTS';
     const ramaData = RAMAS[ramaKey] || RAMAS.SCOUTS;
     return { color: ramaData.color, fondo: `${ramaData.color}22` };
-  }, [userFuncion, user]);
+  }, [userFuncion]);
 
   const getRoleIcon = (func) => {
     if (func === FUNCIONES.JEFE_GRUPO) return <AdminPanelSettings sx={{ fontSize: 20 }} />;
     if (func?.startsWith('ASISTENTE_')) return <Engineering sx={{ fontSize: 20 }} />;
     if (func?.startsWith('PROTAGONISTA_')) return <Groups sx={{ fontSize: 20 }} />;
-    if (func === 'FAMILIA' || user?.role === ROLES.FAMILIA) return <FamilyRestroom sx={{ fontSize: 20 }} />;
+    if (func === ROLES.FAMILIA) return <FamilyRestroom sx={{ fontSize: 20 }} />;
     return <School sx={{ fontSize: 20 }} />;
   };
 
   const getCargoLabel = (func) => {
-    if (user?.role === ROLES.FAMILIA) return "Portal de Familia";
+    if (func === ROLES.FAMILIA) return "Portal de Familia";
     if (func?.startsWith('PROTAGONISTA_')) {
       const ramaKey = func.replace('PROTAGONISTA_', '');
       return `Protagonista ${RAMAS[ramaKey]?.nombre || 'Rama'}`;
@@ -70,7 +73,7 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
   };
 
   const menuItems = useMemo(() => {
-    if (user?.role === ROLES.FAMILIA) {
+    if (userFuncion === ROLES.FAMILIA) {
       return [
         { id: 'MIS_HIJOS', label: 'Mis Hijos', icon: <FamilyRestroom />, vista: 'MIS_HIJOS' },
         { id: 'FINANZAS', label: 'Cuotas y Recibos', icon: <ReceiptLong />, vista: 'FINANZAS' },
@@ -98,6 +101,9 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
     const items = [{ id: 'dashboard', label: 'Inicio', icon: <Dashboard />, vista: 'DASHBOARD' }];
     const esJefe = userFuncion === FUNCIONES.JEFE_GRUPO;
     const esAsistenteProg = userFuncion === FUNCIONES.ASISTENTE_PROG;
+    const esAsistenteAdultos = userFuncion === FUNCIONES.ASISTENTE_ADULTOS;
+    const esAsistenteFinanzas = userFuncion === FUNCIONES.ASISTENTE_ADM;
+    const esAsistenteCom = userFuncion === FUNCIONES.ASISTENTE_COM;
     const esEducador = [FUNCIONES.LOBATOS, FUNCIONES.SCOUTS, FUNCIONES.CAMINANTES, FUNCIONES.ROVERS].includes(userFuncion);
 
     if (esJefe || esEducador || esAsistenteProg) {
@@ -108,30 +114,100 @@ export const Sidebar = ({ ramaSeleccionada, onRamaChange, vistaActual, setVistaA
         { id: 'proyectos', label: 'Revisión Proyectos', icon: <RocketLaunch />, vista: 'REVISION_PROYECTOS' }
       );
     }
-    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_ADM) items.push({ id: 'finanzas', label: 'Caja del Grupo', icon: <AccountBalanceWallet />, vista: 'FINANZAS' });
-    if (esJefe || userFuncion === FUNCIONES.ASISTENTE_COM) items.push({ id: 'noticias', label: 'Panel de Noticias', icon: <Campaign />, vista: 'NOTICIAS' });
+
+    if (esJefe || esAsistenteAdultos) {
+      items.push({ id: 'adultos', label: 'Gestión Adultos', icon: <School />, vista: 'ADULTOS' });
+    }
+
+    if (esJefe || esAsistenteFinanzas) {
+      items.push(
+        { id: 'finanzas', label: 'Caja del Grupo', icon: <AccountBalance />, vista: 'FINANZAS' },
+        { id: 'cuotas', label: 'Control de Cuotas', icon: <Payments />, vista: 'CUOTAS' },
+        { id: 'presupuesto', label: 'Presupuesto Grupal', icon: <AccountBalanceWallet />, vista: 'PRESUPUESTO' }
+      );
+    }
+
+    if (esJefe || esAsistenteCom) {
+      items.push({ id: 'noticias', label: 'Panel de Noticias', icon: <Campaign />, vista: 'NOTICIAS' });
+    }
+
     items.push({ id: 'calendario', label: 'Calendario', icon: <Event />, vista: 'CALENDARIO' });
-    if (esJefe || esEducador || userFuncion === FUNCIONES.ASISTENTE_ADM) items.push({ id: 'documentos', label: 'Legajos', icon: <FolderShared />, vista: 'DOCUMENTOS' });
+
+    if (esJefe || esEducador || esAsistenteFinanzas) {
+      items.push({ id: 'documentos', label: 'Legajos', icon: <FolderShared />, vista: 'DOCUMENTOS' });
+    }
     return items;
-  }, [userFuncion, user]);
+  }, [userFuncion]);
 
   const handleRoleSwitched = (nuevaFuncion) => {
-    if (ROLES_GESTION[nuevaFuncion] || nuevaFuncion === FUNCIONES.JEFE_GRUPO) onRamaChange('TODAS');
-    else if (!nuevaFuncion.startsWith('PROTAGONISTA_') && nuevaFuncion !== 'FAMILIA') onRamaChange(nuevaFuncion.toUpperCase());
-    setVistaActual(user?.role === ROLES.FAMILIA ? 'MIS_HIJOS' : 'DASHBOARD');
+    // 🎯 Mapeo explícito para que los cargos globales pongan la rama en TODAS
+    const cargosGlobales = [
+      FUNCIONES.JEFE_GRUPO, 
+      FUNCIONES.ASISTENTE_PROG, 
+      FUNCIONES.ASISTENTE_ADM, 
+      FUNCIONES.ASISTENTE_COM, 
+      FUNCIONES.ASISTENTE_ADULTOS
+    ];
+
+    if (cargosGlobales.includes(nuevaFuncion)) {
+      onRamaChange('TODAS');
+    } else if (!nuevaFuncion.startsWith('PROTAGONISTA_') && nuevaFuncion !== ROLES.FAMILIA) {
+      onRamaChange(nuevaFuncion.toUpperCase());
+    }
+    
+    setVistaActual(nuevaFuncion === ROLES.FAMILIA ? 'MIS_HIJOS' : 'DASHBOARD');
+  };
+
+  const handleSaveFirma = async (datosFirma) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          firma_url: datosFirma.firmaImg
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      alert("¡Firma digital configurada con éxito!");
+      setIsPerfilOpen(false);
+      window.location.reload(); 
+    } catch (e) {
+      console.error(e);
+      alert("Error al guardar la firma.");
+    }
   };
 
   return (
-    <Drawer variant="permanent" sx={{ width: open ? drawerWidth : 70, transition: 'width 0.3s', '& .MuiDrawer-paper': { width: open ? drawerWidth : 70, overflowX: 'hidden', bgcolor: '#121212', color: 'white', borderRight: 'none', boxShadow: '10px 0 30px rgba(0,0,0,0.5)' } }}>
-      <SidebarHeader open={open} user={user} config={config} getCargoLabel={getCargoLabel} userFuncion={userFuncion} />
-      
-      {/* 🎯 SELECTOR OCULTO PARA FAMILIA Y JÓVENES */}
-      {user?.role !== ROLES.FAMILIA && user?.role !== ROLES.JOVEN && !userFuncion?.startsWith('PROTAGONISTA_') && (
-        <BranchSelector open={open} tienePermisoGlobal={!!ROLES_GESTION[userFuncion]} canChangeRama={canChangeRama} ramaSeleccionada={ramaSeleccionada} onRamaChange={onRamaChange} userFuncion={userFuncion} />
-      )}
+    <>
+      <Drawer variant="permanent" sx={{ width: open ? drawerWidth : 70, transition: 'width 0.3s', '& .MuiDrawer-paper': { width: open ? drawerWidth : 70, overflowX: 'hidden', bgcolor: '#121212', color: 'white', borderRight: 'none', boxShadow: '10px 0 30px rgba(0,0,0,0.5)' } }}>
+        <SidebarHeader open={open} user={user} config={config} getCargoLabel={getCargoLabel} userFuncion={userFuncion} />
+        
+        {userFuncion !== ROLES.FAMILIA && !userFuncion?.startsWith('PROTAGONISTA_') && (
+          <BranchSelector 
+            open={open} 
+            tienePermisoGlobal={[FUNCIONES.JEFE_GRUPO, FUNCIONES.ASISTENTE_PROG, FUNCIONES.ASISTENTE_ADM, FUNCIONES.ASISTENTE_COM, FUNCIONES.ASISTENTE_ADULTOS].includes(userFuncion)} 
+            canChangeRama={canChangeRama} 
+            ramaSeleccionada={ramaSeleccionada} 
+            onRamaChange={onRamaChange} 
+            userFuncion={userFuncion} 
+          />
+        )}
 
-      <NavMenu open={open} items={menuItems} vistaActual={vistaActual} setVistaActual={setVistaActual} config={config} />
-      <UserFooter open={open} userFuncion={userFuncion} config={config} getRoleIcon={getRoleIcon} getCargoLabel={getCargoLabel} onRoleSwitched={handleRoleSwitched} onOpenPerfil={() => alert("Próximamente: Perfil y Firma")} />
-    </Drawer>
+        <NavMenu open={open} items={menuItems} vistaActual={vistaActual} setVistaActual={setVistaActual} config={config} />
+        <UserFooter 
+          open={open} userFuncion={userFuncion} config={config} 
+          getRoleIcon={getRoleIcon} getCargoLabel={getCargoLabel} 
+          onRoleSwitched={handleRoleSwitched} 
+          onOpenPerfil={() => setIsPerfilOpen(true)} 
+        />
+      </Drawer>
+
+      <FirmaDigitalModal 
+        open={isPerfilOpen} 
+        onClose={() => setIsPerfilOpen(false)}
+        user={user}
+        onConfirm={handleSaveFirma}
+      />
+    </>
   );
 };

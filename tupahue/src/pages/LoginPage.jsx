@@ -4,7 +4,7 @@ import {
   IconButton, InputAdornment, CircularProgress, Dialog, DialogTitle, 
   DialogContent, DialogActions, DialogContentText, Alert, Collapse, MenuItem 
 } from '@mui/material';
-import { Visibility, VisibilityOff, Email, PersonAdd, Login, Badge, FamilyRestroom } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Email, PersonAdd, Login, Badge, FamilyRestroom, Person } from '@mui/icons-material';
 import logoTupahue from '../assets/images/logo.png';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; 
@@ -16,7 +16,6 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { login, register } = useAuth(); 
 
-  // --- ESTADOS LOGIN / REGISTRO ---
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,13 +23,14 @@ export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [dni, setDni] = useState(''); 
+  const [nombre, setNombre] = useState(''); 
+  const [apellido, setApellido] = useState('');
   const [role, setRole] = useState(ROLES.JOVEN); 
   const [tieneHijos, setTieneHijos] = useState(false); 
   const [hijosDnis, setHijosDnis] = useState(''); 
 
   const [errorMsg, setErrorMsg] = useState(''); 
 
-  // --- ESTADOS RECUPERACIÓN ---
   const [openRecover, setOpenRecover] = useState(false);
   const [emailRecover, setEmailRecover] = useState('');
   const [recoverLoading, setRecoverLoading] = useState(false);
@@ -39,7 +39,6 @@ export const LoginPage = () => {
   const isEmailInvalid = email !== '' && !email.includes('@');
   const isRecoverEmailInvalid = emailRecover !== '' && !emailRecover.includes('@');
 
-  // 🎯 Función para limpiar DNI (solo números)
   const cleanDni = (value) => value.replace(/\D/g, '');
 
   const handleSubmit = async (e) => {
@@ -51,13 +50,17 @@ export const LoginPage = () => {
 
     try {
       if (isRegister) {
-        // 🎯 Limpiamos el DNI principal y el array de hijos
+        if (!nombre || !apellido || !dni) {
+          throw new Error("Nombre, Apellido y DNI son obligatorios.");
+        }
         const dnisArray = hijosDnis.split(',').map(d => cleanDni(d)).filter(d => d !== '');
         
         await register({ 
           email, 
           password, 
           dni: cleanDni(dni), 
+          nombre, 
+          apellido,
           roleSolicitado: role, 
           hijosDnis: dnisArray 
         });
@@ -68,11 +71,9 @@ export const LoginPage = () => {
       navigate('/dashboard'); 
     } catch (error) {
       console.error("Error Auth:", error.message);
-      if (error.message.includes('Invalid login credentials')) {
-        setErrorMsg('Email o contraseña incorrectos.');
-      } else {
-        setErrorMsg(error.message || 'Hubo un problema al conectar con el servidor.');
-      }
+      setErrorMsg(error.message.includes('Invalid login credentials') 
+        ? 'Email o contraseña incorrectos.' 
+        : error.message || 'Hubo un problema al conectar con el servidor.');
     } finally {
       setLoading(false);
     }
@@ -138,10 +139,23 @@ export const LoginPage = () => {
                     value={role} onChange={(e) => setRole(e.target.value)}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                   >
-                    <MenuItem value={ROLES.JOVEN}>Joven (Beneficiario)</MenuItem>
+                    <MenuItem value={ROLES.JOVEN}>Joven (Protagonista)</MenuItem>
                     <MenuItem value={ROLES.EDUCADOR}>Educador (Dirigente)</MenuItem>
                     <MenuItem value={ROLES.FAMILIA}>Familiar / Tutor</MenuItem>
                   </TextField>
+
+                  <Stack direction="row" spacing={1}>
+                    <TextField 
+                      fullWidth label="Nombre" size="small"
+                      value={nombre} onChange={(e) => setNombre(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                    <TextField 
+                      fullWidth label="Apellido" size="small"
+                      value={apellido} onChange={(e) => setApellido(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                  </Stack>
 
                   <TextField 
                     fullWidth label="Mi DNI" size="small"
@@ -152,7 +166,7 @@ export const LoginPage = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Badge sx={{ fontSize: 20, color: '#ccc' }} />
+                          <Person sx={{ fontSize: 20, color: '#ccc' }} />
                         </InputAdornment>
                       ),
                     }}
@@ -174,7 +188,7 @@ export const LoginPage = () => {
                           size="small" fullWidth sx={{ mt: 1, bgcolor: 'white' }}
                           value={hijosDnis} 
                           onChange={(e) => setHijosDnis(e.target.value)}
-                          helperText="Usar solo números (separados por coma si son varios)"
+                          helperText="Usar solo números (separados por coma)"
                         />
                       )}
                     </Box>
@@ -244,7 +258,34 @@ export const LoginPage = () => {
         </Paper>
       </Container>
 
-      {/* Modal de Recuperación omitido por brevedad, se mantiene igual */}
+      <Dialog open={openRecover} onClose={() => setOpenRecover(false)}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Recuperar Contraseña</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Ingresá tu email y te enviaremos un enlace para restablecer tu contraseña.
+          </DialogContentText>
+          {recoverSent ? (
+            <Alert severity="success">Enlace enviado. Revisá tu casilla de correo.</Alert>
+          ) : (
+            <TextField
+              autoFocus margin="dense" label="Email" type="email" fullWidth variant="outlined"
+              value={emailRecover} onChange={(e) => setEmailRecover(e.target.value)}
+              error={isRecoverEmailInvalid}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenRecover(false)}>Cancelar</Button>
+          {!recoverSent && (
+            <Button 
+              onClick={handleRecoverPassword} variant="contained" disabled={recoverLoading || !emailRecover || isRecoverEmailInvalid}
+              sx={{ bgcolor: VIOLETA_SCOUT }}
+            >
+              {recoverLoading ? <CircularProgress size={20} /> : 'Enviar'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

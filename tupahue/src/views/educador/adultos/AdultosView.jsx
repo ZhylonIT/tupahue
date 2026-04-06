@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Box, Typography, Grid, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, Avatar, Stack, 
@@ -8,7 +8,7 @@ import {
   LinearProgress, Tooltip, Divider
 } from '@mui/material';
 import { 
-  School, Add, DeleteOutline, Visibility, Save, Close, Badge, 
+  School, Add, DeleteOutline, Save, Close, Badge, 
   CheckBox as CheckBoxIcon, CheckCircle, Insights, Print
 } from '@mui/icons-material';
 import { useAdultos } from '../../../hooks/useAdultos';
@@ -17,9 +17,11 @@ import { EXPERIENCIAS_FORMACION } from '../../../constants/adultos';
 
 const VIOLETA_SCOUT = '#5A189A';
 
-// --- COMPONENTE DE BARRA DE PROGRESO ---
 const ProgresoFormacion = ({ adulto }) => {
-  const experienciasRama = (adulto.ramas || []).flatMap(r => EXPERIENCIAS_FORMACION.POR_RAMA[r] || []);
+  // 🎯 Detectamos las ramas desde sus funciones
+  const funcionesRama = (adulto.funciones || []).filter(f => ['LOBATOS', 'SCOUTS', 'CAMINANTES', 'ROVERS'].includes(f));
+  const experienciasRama = funcionesRama.flatMap(r => EXPERIENCIAS_FORMACION.POR_RAMA[r] || []);
+  
   const totalExperiencias = EXPERIENCIAS_FORMACION.COMUNES.length + experienciasRama.length;
   const completadas = (adulto.formacion || []).length;
   const porcentaje = totalExperiencias > 0 ? (completadas / totalExperiencias) * 100 : 0;
@@ -41,7 +43,7 @@ const ProgresoFormacion = ({ adulto }) => {
 };
 
 export const AdultosView = () => {
-  const { adultos, agregarAdulto, eliminarAdulto, actualizarFormacion, actualizarPlanDesempeño } = useAdultos();
+  const { adultos, loading, agregarAdulto, eliminarAdulto, actualizarFormacion, actualizarPlanDesempeño } = useAdultos();
   const [openAlta, setOpenAlta] = useState(false);
   const [adultoSeleccionado, setAdultoSeleccionado] = useState(null);
   const [openSelect, setOpenSelect] = useState(false);
@@ -52,10 +54,13 @@ export const AdultosView = () => {
         alert("Faltan datos obligatorios");
         return;
     }
-    agregarAdulto({ ...nuevoAdulto, ramas: nuevoAdulto.funciones }); 
+    // 🎯 Quitamos la key 'ramas' para no romper el esquema de Supabase
+    agregarAdulto({ ...nuevoAdulto }); 
     setOpenAlta(false);
     setNuevoAdulto({ nombre: '', apellido: '', dni: '', funciones: [] });
   };
+
+  if (loading) return <Box sx={{ p: 4 }}><LinearProgress /></Box>;
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
@@ -113,7 +118,6 @@ export const AdultosView = () => {
         </Table>
       </TableContainer>
 
-      {/* DIALOGO ALTA */}
       <Dialog open={openAlta} onClose={() => setOpenAlta(false)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 900 }}>Alta de Educador</DialogTitle>
         <DialogContent dividers>
@@ -180,20 +184,20 @@ const LegajoModal = ({ adulto, onClose, actualizarFormacion, actualizarPlanDesem
   };
 
   const experienciasFiltradas = useMemo(() => {
+    // 🎯 Detectamos las ramas desde sus funciones
+    const funcionesRama = (adulto.funciones || []).filter(f => ['LOBATOS', 'SCOUTS', 'CAMINANTES', 'ROVERS'].includes(f));
     const todas = [
       ...EXPERIENCIAS_FORMACION.COMUNES,
-      ...(adulto.ramas || []).flatMap(r => EXPERIENCIAS_FORMACION.POR_RAMA[r] || [])
+      ...funcionesRama.flatMap(r => EXPERIENCIAS_FORMACION.POR_RAMA[r] || [])
     ];
     return {
       basico: todas.filter(e => e.nivel === 1),
       intermedio: todas.filter(e => e.nivel === 2),
       avanzado: todas.filter(e => e.nivel === 3)
     };
-  }, [adulto.ramas]);
+  }, [adulto.funciones]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => { window.print(); };
 
   const renderNivel = (titulo, lista, color) => (
     <Box sx={{ mb: 4 }}>
@@ -243,14 +247,13 @@ const LegajoModal = ({ adulto, onClose, actualizarFormacion, actualizarPlanDesem
       </DialogTitle>
       
       <DialogContent sx={{ p: 3, bgcolor: '#fbfbfb' }} className="print-area">
-        {/* ENCABEZADO PARA IMPRESIÓN (OCULTO EN PANTALLA) */}
         <Box sx={{ display: 'none', '@media print': { display: 'block', mb: 4 } }}>
             <Typography variant="h4" textAlign="center" sx={{ fontWeight: 900, mb: 1 }}>PLAN DE DESEMPEÑO ADULTO</Typography>
             <Typography variant="h6" textAlign="center" gutterBottom>Grupo Scout Tupahue • SNF 2025</Typography>
             <Divider sx={{ my: 2 }} />
             <Typography><strong>Educador:</strong> {adulto.apellido}, {adulto.nombre}</Typography>
             <Typography><strong>DNI:</strong> {adulto.dni}</Typography>
-            <Typography><strong>Funciones:</strong> {adulto.funciones.join(', ')}</Typography>
+            <Typography><strong>Funciones:</strong> {adulto.funciones?.join(', ')}</Typography>
             <Divider sx={{ my: 2 }} />
         </Box>
 
@@ -277,7 +280,6 @@ const LegajoModal = ({ adulto, onClose, actualizarFormacion, actualizarPlanDesem
               <Typography sx={{ display: 'none', '@media print': { display: 'block', whiteSpace: 'pre-wrap' } }}>{plan.objetivos}</Typography>
             </Paper>
 
-            {/* FIRMAS PARA IMPRESIÓN */}
             <Box sx={{ display: 'none', '@media print': { display: 'block', mt: 8 } }}>
                 <Grid container spacing={8}>
                     <Grid item xs={6} textAlign="center">
