@@ -69,3 +69,114 @@ Recibos Oficiales: Integración del sistema de impresión en A4 para que el jove
 Modularización: Se extrajeron componentes complejos (Modales de evaluación, Plantillas de recibo) para mantener las vistas principales limpias y fáciles de mantener.
 Sincronización: Uso de useMemo y efectos de sincronización para garantizar que los datos del localStorage se reflejen instantáneamente en toda la aplicación.
 Normalización: Blindaje en la búsqueda de datos mediante normalización de texto (Mayúsculas/Recorte de espacios) para evitar errores de vinculación.
+
+
+
+🛠️ Log de Backend (Supabase)
+Hemos transformado una base de datos vacía en un motor funcional. Esto es lo que vive hoy en tu servidor:
+
+1. Estructura de Tablas (Esquema public)
+profiles: Conectada a la autenticación. Guarda el role (ADMIN/EDUCADOR) y el array de funciones (JEFE_GRUPO, etc.).
+
+scouts: La nómina real. Migrada a camelCase (fechaNacimiento, fichaEntregada) para hablar el mismo idioma que React.
+
+proyectos: Estructura lista para recibir los planes de los jóvenes (también en camelCase).
+
+eventos: Tabla para el calendario del grupo.
+
+movimientos: Estructura para la caja y finanzas.
+
+2. Automatización y Seguridad
+Trigger on_auth_user_created: Cada vez que creás un usuario en la pestaña Auth, se crea automáticamente su "DNI digital" en la tabla de perfiles.
+
+Políticas RLS (Seguridad):
+
+profiles: Cada uno ve lo suyo.
+
+scouts: Permiso total (Lectura, Inserción, Edición) para usuarios autenticados. Nota: Falta pulir esto para que un Caminante no pueda borrar un Lobato, pero por ahora sirve para desarrollo.
+
+3. Ajustes de "Compatibilidad"
+Renombramos columnas de snake_case a camelCase directamente en Postgres.
+
+Agregamos columnas faltantes que pedía tu formulario: fichaEntregada, funcion, celular, direccion, etc.
+
+💻 Resumen de Frontend (React)
+Pasamos de una maqueta estática a una aplicación conectada. Este es el estado de la App:
+
+1. Conexión y Variables de Entorno
+Archivo .env en la raíz con las llaves de Supabase.
+
+src/lib/supabaseClient.js: El puente oficial de conexión.
+
+2. Gestión de Identidad (AuthContext.jsx)
+El login ya no es un "mock". Ahora login(email, password) le pide permiso a Supabase.
+
+Persistencia: Al recargar la página, el contexto busca la sesión activa y descarga el perfil del usuario (nombre, rol y funciones) antes de mostrar nada.
+
+3. El Motor del Dashboard (useDashboard.jsx)
+Adiós LocalStorage: Los scouts y proyectos ahora se buscan con useEffect y fetchData desde la base de datos.
+
+Handlers Asíncronos: handleSaveScout, handleToggleAsistencia y otros ahora usan await supabase para que los cambios sean permanentes.
+
+Lógica de Ramas: Se mantiene la inteligencia de deducir en qué rama estás parado según tu función (ej: si sos educador de Lobatos, el sistema te filtra la nómina automáticamente).
+
+4. Rutas y Vistas (Tupahue.jsx & DashboardPage.jsx)
+ProtectedRoute: Ahora verifica si hay un usuario real de Supabase.
+
+Detección de Roles: El Dashboard ahora acepta tanto ROLES.EDUCADOR como ADMIN (el rol que te pusimos en la DB).
+
+🚩 Estado Actual: "Campamento listo"
+¿Qué funciona? Login, ver sidebar según cargo, ver nómina real, crear/editar scouts en la nube.
+
+¿Qué falta? Conectar la pestaña de Proyectos y Eventos (darles permisos RLS en el backend) y probar la lógica de Finanzas.
+
+Nota para el futuro: Si perdés la sesión o llegamos al límite de memoria, recordá que ya no dependemos del localStorage para los scouts; Máximo Gustavo y los que vengan después están seguros en el servidor de Supabase.
+Tupahue OS: Resumen de Sincronización [Abril 2026]
+1. Arquitectura y Autenticación (El "Cerebro")
+Ruteo Inteligente: Modificamos Tupahue.jsx y AuthContext.jsx para implementar un redireccionador por roles. Ya no entran todos a la misma bolsa; ahora el sistema detecta si sos ADMIN/EDUCADOR, JOVEN o FAMILIA y te manda a tu dashboard específico.
+
+Estado Global: El AuthContext ahora gestiona la "Función" activa (ej. Protagonista para jóvenes) y asegura que los datos del perfil de Supabase estén cargados antes de mostrar la interfaz.
+
+2. Dashboard del Joven (La Experiencia de Máximo)
+Mi Rama: Creamos una vista mística con la Ley, Promesa y Próximas Actividades. Unificamos terminología SAAC: Cacerías (Lobatos) y Proyectos (Scouts, Caminantes, Rovers).
+
+Gestión de Proyectos: Implementamos el flujo completo de creación de proyectos con un Stepper de 4 pasos. Los chicos pueden guardar borradores, enviar a revisión y recibir feedback (alertas de comentarios) de los educadores en tiempo real.
+
+Progresión Personal: Seteamos el Plan Personal de Acción (Metas y Visión). Corregimos el error de sincronización creando las columnas metasPP (JSONB) y las visiones en la DB.
+
+3. Dashboard del Educador (Tu Panel de Control)
+Revisión de Proyectos: Creamos una bandeja de entrada donde aprobás o devolvés proyectos con observaciones. Está linkeado directamente con lo que ve el joven.
+
+Calendario de Coordinación: Implementamos un calendario de "Visibilidad Total". Todos ven lo de todos para no pisarse con los lugares o materiales, pero cada evento tiene el color y el nombre de la Rama que lo organiza.
+
+Base de Datos (Supabase): * Configuramos RLS (Row Level Security): Los jóvenes solo editan su propia ficha; los educadores pueden editar todo lo pedagógico.
+
+Estructuramos las tablas scouts (con user_id), proyectos y eventos (con hora, lugar y rama).
+
+4. Estado Actual de la Estructura
+Vínculo: El sistema ya identifica quién es quién.
+
+Próximo Paso: Dashboard de Familia (Legajos, Fichas Médicas y Autorizaciones).
+
+Desde el último resumen, blindamos el sistema de acceso transformando la LoginPage en una plataforma híbrida de Login y 
+Registro Inteligente. Implementamos una lógica de reclamación de cuentas donde los Jóvenes y Educadores deben estar precargados 
+en el sistema para validar su identidad por DNI (evitando intrusos), mientras que las Familias ahora pueden registrarse libremente
+ y vincular a sus hijos al instante mediante una lista de DNIs sanitizada (sin puntos ni comas). En el AuthContext, habilitamos 
+ el soporte multi-rol (permitiendo que un Educador sea también Padre y salte entre dashboards) y resolvimos errores críticos de 
+ Supabase: configuramos las políticas de seguridad (RLS), sorteamos los límites de envío de correos desactivando la confirmación 
+ obligatoria, y eliminamos los conflictos de "llave duplicada" usando .upsert(). Finalmente, optimizamos la sincronización del 
+ estado para eliminar el error del "cargando infinito", logrando que tras el registro el usuario entre directo a su dashboard 
+ con sus datos y vínculos de padre_id ya impactados en la base de datos.
+
+ Log de Intervenciones (Sesión Fichas & PDFs)
+Estabilización del Dashboard: Corregimos el auto-refresh y el círculo de carga infinito en FamiliaDashboardPage. Ahora los datos se actualizan en segundo plano sin "pestañeos" blancos.
+
+Cierre de Modales: Eliminamos el bug en DocumentacionView que cerraba los formularios automáticamente al guardar. Ahora el modal solo se cierra cuando el usuario lo decide.
+
+Motor de PDF Vectorial: Jubilamos a html2canvas (que sacaba fotos borrosas) y creamos un generador programático en pdfGeneradorFichas.jsx que "dibuja" el PDF con coordenadas exactas.
+
+Calibración de Diseño: Llevamos el diseño del PDF a un nivel de clon oficial SAAC: doble columna, logo nítido, márgenes A4 y tipografía profesional.
+
+Integración de Datos: Sincronizamos FichaMedicaForm con el PDF para incluir campos que faltaban (CUD, Salud Mental completa, Cuadro de Vacunas Triple, etc.).
+
+Acceso del Educador: Modificamos DocumentosView para que el dirigente abra el PDF real desde el Storage y no una captura vieja, incluyendo un truco anti-caché (timestamp en la URL).

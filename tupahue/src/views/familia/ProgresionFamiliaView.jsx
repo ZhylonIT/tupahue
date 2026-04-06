@@ -18,8 +18,8 @@ export const ProgresionFamiliaView = ({ hijo }) => {
   const categorias = esRover ? AREAS_ROVERS : SENDEROS;
   const objetivosRama = OBJETIVOS_POR_RAMA[ramaId] || {};
   
-  // Leemos los objetivos directamente del objeto hijo guardado por el educador
-  const objetivosLogrados = Array.isArray(hijo.progresion?.objetivos) ? hijo.progresion.objetivos : [];
+  // 🎯 CONEXIÓN A SUPABASE: Leemos directo de la columna JSONB que creamos
+  const objetivosLogrados = Array.isArray(hijo.objetivos_logrados) ? hijo.objetivos_logrados : [];
 
   return (
     <Box sx={{ animation: 'fadeIn 0.3s' }}>
@@ -66,7 +66,7 @@ export const ProgresionFamiliaView = ({ hijo }) => {
             {categorias.map((cat) => {
               const listaObjetivos = objetivosRama[cat.id] || [];
               const completados = listaObjetivos.filter(obj => objetivosLogrados.includes(obj)).length;
-              const porcentaje = (completados / listaObjetivos.length) * 100;
+              const porcentaje = listaObjetivos.length > 0 ? (completados / listaObjetivos.length) * 100 : 0;
 
               return (
                 <Accordion key={cat.id} sx={{ borderRadius: 3, border: '1px solid #eee' }}>
@@ -82,12 +82,15 @@ export const ProgresionFamiliaView = ({ hijo }) => {
                   </AccordionSummary>
                   <AccordionDetails sx={{ bgcolor: '#fafafa' }}>
                     <Stack spacing={1.5}>
-                      {listaObjetivos.map((obj, idx) => (
-                        <Stack key={idx} direction="row" spacing={1.5}>
-                          {objetivosLogrados.includes(obj) ? <CheckCircle sx={{ color: cat.color, fontSize: 18 }} /> : <RadioButtonUnchecked sx={{ color: '#ccc', fontSize: 18 }} />}
-                          <Typography variant="caption" sx={{ color: objetivosLogrados.includes(obj) ? '#333' : '#999' }}>{obj}</Typography>
-                        </Stack>
-                      ))}
+                      {listaObjetivos.map((obj, idx) => {
+                        const estaLogrado = objetivosLogrados.includes(obj);
+                        return (
+                          <Stack key={idx} direction="row" spacing={1.5}>
+                            {estaLogrado ? <CheckCircle sx={{ color: cat.color, fontSize: 18 }} /> : <RadioButtonUnchecked sx={{ color: '#ccc', fontSize: 18 }} />}
+                            <Typography variant="caption" sx={{ color: estaLogrado ? '#333' : '#999' }}>{obj}</Typography>
+                          </Stack>
+                        );
+                      })}
                     </Stack>
                   </AccordionDetails>
                 </Accordion>
@@ -95,12 +98,13 @@ export const ProgresionFamiliaView = ({ hijo }) => {
             })}
           </Stack>
 
-          {hijo.progresion?.obsPadres && (
+          {/* 🎯 CONEXIÓN A SUPABASE: Leemos de observacionesFamilia */}
+          {hijo.observacionesFamilia && (
             <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#fffde7', border: '1px solid #fff59d', display: 'flex', gap: 2 }}>
               <Box sx={{ color: '#fbc02d' }}><FamilyRestroom /></Box>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#f9a825', mb: 0.5 }}>Mensaje de los Educadores</Typography>
-                <Typography variant="body2" sx={{ color: '#5d4037', fontStyle: 'italic', lineHeight: 1.6 }}>"{hijo.progresion.obsPadres}"</Typography>
+                <Typography variant="body2" sx={{ color: '#5d4037', fontStyle: 'italic', lineHeight: 1.6 }}>"{hijo.observacionesFamilia}"</Typography>
               </Box>
             </Paper>
           )}

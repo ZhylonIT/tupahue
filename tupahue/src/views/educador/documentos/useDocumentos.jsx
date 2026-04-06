@@ -11,24 +11,23 @@ export const useDocumentos = (scouts, ramaId) => {
     ? { nombre: 'Todo el Grupo', color: '#5A189A' } 
     : (RAMAS[idBusqueda] || RAMAS.CAMINANTES);
 
-  // Función para determinar si el legajo está 100% completo
-  const legajoCompleto = (scout) => scout.fichaEntregada; 
+  // Consideramos el legajo completo si tiene al menos los 3 documentos obligatorios
+  const legajoCompleto = (scout) => {
+    const obligatorios = ['ingreso_menores', 'fotocopias_dni', 'partida_nacimiento'];
+    const docs = scout.documentos || [];
+    return obligatorios.every(req => docs.includes(req));
+  }; 
 
-  // --- NUEVA LÓGICA DE AVALES ---
-  // Detecta si el beneficiario subió la planilla de ingreso pero los educadores aún no la "firmaron"
+  // Detecta si subió la planilla de ingreso pero los educadores aún no la "firmaron"
   const requiereFirmaIngreso = (scout) => {
     const tieneDocIngreso = scout.documentos?.includes('ingreso_menores');
-    // Si tiene el documento pero NO tiene la propiedad de aval en true, requiere atención
     return tieneDocIngreso && !scout.avaladoPorEducadores;
   };
 
-  // Filtrado múltiple memorizado para mejor rendimiento
   const scoutsFiltrados = useMemo(() => {
     return scouts.filter(s => {
-      // Si es vista global, no filtramos por rama; si no, comparamos con la rama seleccionada
       const matchRama = esVistaGlobal || (s.rama && s.rama.toUpperCase() === idBusqueda);
       
-      // Búsqueda por Nombre, Apellido o DNI
       const nom = (s.nombre || "").toLowerCase();
       const ape = (s.apellido || "").toLowerCase();
       const dni = (s.dni || "").toString();
@@ -47,6 +46,6 @@ export const useDocumentos = (scouts, ramaId) => {
     CONFIG_RAMA,
     scoutsFiltrados, 
     legajoCompleto,
-    requiereFirmaIngreso // Exportamos la nueva utilidad
+    requiereFirmaIngreso
   };
 };

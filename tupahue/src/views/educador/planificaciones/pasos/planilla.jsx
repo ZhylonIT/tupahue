@@ -3,7 +3,8 @@ import {
   Typography, Paper, Stack, Box, Table, TableBody, 
   TableCell, TableContainer, TableHead, TableRow, 
   TextField, Button, IconButton, Divider, Grid,
-  FormControl, Select, MenuItem, Checkbox, ListItemText, OutlinedInput
+  FormControl, Select, MenuItem, Checkbox, ListItemText, OutlinedInput,
+  Autocomplete 
 } from '@mui/material';
 import { 
   Add, Delete, AccessTime, Flag, ListAlt, 
@@ -13,11 +14,11 @@ import {
 // IMPORTACIÓN DE TUS CONSTANTES
 import { SENDEROS, AREAS_ROVERS, OBJETIVOS_POR_RAMA } from '../../../../constants/progresion';
 
-export const PasoPlanilla = ({ ramaId, data, setData }) => {
+// 🎯 Recibimos 'scouts' (para info general) y 'adultos' (para responsables)
+export const PasoPlanilla = ({ ramaId, data, setData, scouts, adultos }) => {
 
   const [savedSections, setSavedSections] = useState({ obj: false });
   const [savedActivities, setSavedActivities] = useState({});
-  // NUEVO: Estado para controlar qué menú desplegable está abierto
   const [openDropdown, setOpenDropdown] = useState(null); 
 
   // Lógica para detectar qué áreas/senderos mostrar según la rama
@@ -25,6 +26,9 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
   const esRover = ramaUpper === 'ROVERS';
   const areasActivas = esRover ? AREAS_ROVERS : SENDEROS;
   const objetivosDisponibles = OBJETIVOS_POR_RAMA[ramaUpper] || {};
+
+  // 🎯 CAMBIO: Ahora mapeamos ADULTOS para las sugerencias de responsabilidad legal/pedagógica
+  const sugerenciasResponsables = adultos?.map(a => `${a.nombre} ${a.apellido}`) || [];
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -94,7 +98,7 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
   };
 
   const sectionCardStyle = { borderRadius: 4, overflow: 'hidden', bgcolor: 'white', border: '1px solid #eee', mb: 4 };
-  const labelStyle = { fontWeight: 900, color: 'primary.main', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem', textTransform: 'uppercase' };
+  const labelStyle = { fontWeight: 900, color: 'primary.main', mb: 1, display: 'center', alignItems: 'center', gap: 0.5, fontSize: '0.75rem', textTransform: 'uppercase' };
 
   return (
     <Box sx={{ maxWidth: '1000px', mx: 'auto', py: 2 }}>
@@ -164,7 +168,7 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
         </Box>
       </Paper>
 
-      {/* 3. CRONOGRAMA */}
+      {/* 3. CRONOGRAMA CON SINCRONIZACIÓN DE RESPONSABLES */}
       <Paper elevation={0} sx={sectionCardStyle}>
         <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fafafa', borderBottom: '1px solid #eee' }}>
           <Stack direction="row" alignItems="center" gap={1.5}>
@@ -180,16 +184,31 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, color: 'text.disabled', fontSize: '0.7rem' }}>HORA</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: 'text.disabled', fontSize: '0.7rem' }}>ACTIVIDAD</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: 'text.disabled', fontSize: '0.7rem' }}>RESPONSABLE</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: 'text.disabled', fontSize: '0.7rem' }}>RESPONSABLE (EDUCADOR)</TableCell>
                   <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {(data.cronograma || []).map((item, i) => (
                   <TableRow key={i} hover>
-                    <TableCell sx={{ width: '15%' }}><TextField variant="standard" fullWidth value={item.horario} onChange={(e) => editarCronograma(i, 'horario', e.target.value)} InputProps={{ disableUnderline: true }} placeholder="15:00" /></TableCell>
-                    <TableCell sx={{ width: '55%' }}><TextField variant="standard" fullWidth value={item.actividad} onChange={(e) => editarCronograma(i, 'actividad', e.target.value)} InputProps={{ disableUnderline: true, sx: { fontWeight: 600 } }} placeholder="Actividad" /></TableCell>
-                    <TableCell sx={{ width: '25%' }}><TextField variant="standard" fullWidth value={item.responsable} onChange={(e) => editarCronograma(i, 'responsable', e.target.value)} InputProps={{ disableUnderline: true }} placeholder="Nombre" /></TableCell>
+                    <TableCell sx={{ width: '15%' }}>
+                      <TextField variant="standard" fullWidth value={item.horario} onChange={(e) => editarCronograma(i, 'horario', e.target.value)} InputProps={{ disableUnderline: true }} placeholder="15:00" />
+                    </TableCell>
+                    <TableCell sx={{ width: '45%' }}>
+                      <TextField variant="standard" fullWidth value={item.actividad} onChange={(e) => editarCronograma(i, 'actividad', e.target.value)} InputProps={{ disableUnderline: true, sx: { fontWeight: 600 } }} placeholder="Actividad" />
+                    </TableCell>
+                    <TableCell sx={{ width: '35%' }}>
+                      {/* 🎯 Sincronizamos con ADULTOS usando Autocomplete */}
+                      <Autocomplete
+                        freeSolo
+                        options={sugerenciasResponsables}
+                        value={item.responsable}
+                        onInputChange={(event, newValue) => editarCronograma(i, 'responsable', newValue)}
+                        renderInput={(params) => (
+                          <TextField {...params} variant="standard" placeholder="Seleccionar educador..." InputProps={{ ...params.InputProps, disableUnderline: true }} />
+                        )}
+                      />
+                    </TableCell>
                     <TableCell align="right">
                       <IconButton onClick={() => setData(prev => ({...prev, cronograma: prev.cronograma.filter((_, idx) => idx !== i)}))} color="error" size="small"><Delete fontSize="small"/></IconButton>
                     </TableCell>
@@ -235,14 +254,13 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
 
                 <Divider sx={{ borderStyle: 'dashed' }} />
 
-                {/* --- OBJETIVOS EDUCATIVOS CON BOTÓN "CONFIRMAR" --- */}
                 <Box sx={{ bgcolor: isLocked ? 'transparent' : '#f8f9fa', p: isLocked ? 0 : 2, borderRadius: 2 }}>
-                  <Typography sx={labelStyle}><MenuBook sx={{fontSize: 14}}/> OBJETIVOS EDUCATIVOS ({esRover ? 'Áreas de Crecimiento' : 'Senderos'})</Typography>
+                  <Typography sx={labelStyle}><MenuBook sx={{fontSize: 14}}/> OBJETIVOS EDUCATIVOS</Typography>
                   <Grid container spacing={3} sx={{ mt: 0.5 }}>
                     {areasActivas.map(area => {
                       const opcionesArea = objetivosDisponibles[area.id] || [];
                       const seleccionados = act.objetivosEducativos?.[area.nombre] || [];
-                      const selectKey = `${act.id}-${area.id}`; // Identificador único para este desplegable
+                      const selectKey = `${act.id}-${area.id}`; 
                       
                       if (opcionesArea.length === 0) return null;
                       if (isLocked && seleccionados.length === 0) return null;
@@ -265,17 +283,10 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
                                 onChange={(e) => editarObjetivosEducativos(act.id, area.nombre, e.target.value)}
                                 input={<OutlinedInput sx={{ bgcolor: isLocked ? 'transparent' : 'white' }} />}
                                 renderValue={(selected) => {
-                                  if (selected.length === 0) {
-                                    return <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Seleccionar...</span>;
-                                  }
+                                  if (selected.length === 0) return <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Seleccionar...</span>;
                                   return <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{`${selected.length} objetivo${selected.length > 1 ? 's' : ''}`}</span>;
                                 }}
-                                // Límite de altura para que el botón siempre se vea abajo
-                                MenuProps={{
-                                  PaperProps: {
-                                    sx: { maxHeight: 350 }
-                                  }
-                                }}
+                                MenuProps={{ PaperProps: { sx: { maxHeight: 350 } } }}
                               >
                                 {opcionesArea.map((obj) => (
                                   <MenuItem key={obj} value={obj} sx={{ whiteSpace: 'normal', mb: 1 }}>
@@ -283,26 +294,8 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
                                     <ListItemText primary={obj} primaryTypographyProps={{ fontSize: '0.85rem', lineHeight: 1.2 }} />
                                   </MenuItem>
                                 ))}
-                                
-                                {/* BOTÓN DE CONFIRMAR AL FINAL DEL MENÚ */}
-                                <Box sx={{ 
-                                  position: 'sticky', 
-                                  bottom: 0, 
-                                  bgcolor: 'background.paper', 
-                                  pt: 1, pb: 1, px: 2, 
-                                  borderTop: '1px solid #eee', 
-                                  zIndex: 1,
-                                  display: 'flex',
-                                  justifyContent: 'flex-end'
-                                }}>
-                                  <Button 
-                                    variant="contained" 
-                                    size="small" 
-                                    onClick={() => setOpenDropdown(null)}
-                                    sx={{ fontWeight: 700, borderRadius: 2 }}
-                                  >
-                                    Confirmar
-                                  </Button>
+                                <Box sx={{ position: 'sticky', bottom: 0, bgcolor: 'background.paper', pt: 1, pb: 1, px: 2, borderTop: '1px solid #eee', zIndex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                                  <Button variant="contained" size="small" onClick={() => setOpenDropdown(null)} sx={{ fontWeight: 700, borderRadius: 2 }}>Confirmar</Button>
                                 </Box>
                               </Select>
                             </FormControl>
@@ -315,7 +308,7 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
 
                 <Box>
                   <Typography sx={labelStyle}><Flag sx={{fontSize: 14}}/> OBJETIVOS DEL JUEGO / DINÁMICA</Typography>
-                  <TextField multiline fullWidth variant="standard" placeholder="¿Qué buscamos lograr con esta dinámica?..." value={act.objetivos} onChange={(e) => editarActividad(act.id, 'objetivos', e.target.value)} disabled={isLocked} InputProps={{ disableUnderline: true, sx: { color: isLocked ? 'text.primary' : 'inherit' } }} />
+                  <TextField multiline fullWidth variant="standard" placeholder="¿Qué buscamos lograr?..." value={act.objetivos} onChange={(e) => editarActividad(act.id, 'objetivos', e.target.value)} disabled={isLocked} InputProps={{ disableUnderline: true, sx: { color: isLocked ? 'text.primary' : 'inherit' } }} />
                 </Box>
 
                 <Box>
@@ -348,17 +341,12 @@ export const PasoPlanilla = ({ ramaId, data, setData }) => {
               
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                 {data.listaActividades.length > 1 && !isLocked && (
-                  <Button color="error" variant="outlined" startIcon={<Delete />} onClick={() => eliminarActividad(act.id)} size="small" sx={{ borderRadius: 2, fontWeight: 700 }}>
-                    Eliminar Ficha
-                  </Button>
+                  <Button color="error" variant="outlined" startIcon={<Delete />} onClick={() => eliminarActividad(act.id)} size="small" sx={{ borderRadius: 2, fontWeight: 700 }}>Eliminar Ficha</Button>
                 )}
                 <Button 
                   startIcon={isLocked ? <Edit /> : <Save />} 
                   onClick={() => toggleActivity(act.id)} 
-                  size="small" 
-                  variant={isLocked ? "outlined" : "contained"} 
-                  color="primary" 
-                  sx={{ borderRadius: 2, fontWeight: 700 }}
+                  size="small" variant={isLocked ? "outlined" : "contained"} color="primary" sx={{ borderRadius: 2, fontWeight: 700 }}
                 >
                   {isLocked ? "Modificar Ficha" : "Guardar Ficha"}
                 </Button>

@@ -22,36 +22,36 @@ const DRAWER_WIDTH = 280;
 export const JovenDashboardPage = () => {
   const { user, userFuncion, logout } = useAuth();
   
-  // 🔗 DETALLE 1: Cambiamos el estado inicial de 'PROGRESION' a 'MI_RAMA'
   const [vistaActual, setVistaActual] = useState('MI_RAMA');
 
-  // 🛠️ MODO DESARROLLADOR LOCAL
+  // 🛠️ MODO DESARROLLADOR: Te permite seguir testeando aunque no estés logueado como joven
   const isDevMode = true; 
   const [devSelectedDni, setDevSelectedDni] = useState(''); 
 
   const state = useDashboard(user, [], [], userFuncion);
 
-  // Lógica de vinculación INTELIGENTE
+  // 🎯 VINCULACIÓN REAL: Buscamos al beneficiario que tenga nuestro user_id
   const yo = useMemo(() => {
     if (!state.scouts || state.scouts.length === 0) return null;
     
+    // 1. Si estamos en DEV y usamos el switch naranja:
     if (isDevMode && devSelectedDni) {
       return state.scouts.find(s => String(s.dni) === String(devSelectedDni));
     }
 
-    const encontrado = state.scouts.find(s => String(s.dni) === String(user?.dni));
+    // 2. LÓGICA DE PRODUCCIÓN: Buscamos el registro en la tabla scouts donde user_id coincida
+    const encontrado = state.scouts.find(s => s.user_id === user?.id);
     
-    if (isDevMode && !encontrado) {
+    // 3. Fallback de cortesía para DEV (si no encuentra por ID, toma el último)
+    if (isDevMode && !encontrado && !devSelectedDni) {
       return state.scouts[state.scouts.length - 1]; 
     }
     
     return encontrado;
   }, [state.scouts, user, isDevMode, devSelectedDni]);
 
-  // Determinamos si es Rover leyendo la rama REAL del scout seleccionado
-  const esRover = isDevMode 
-    ? (yo?.rama?.toUpperCase() === 'ROVERS') 
-    : (userFuncion === FUNCIONES.PROTAGONISTA_ROVER);
+  // Determinamos si es Rover basándonos en los datos reales de la base de datos
+  const esRover = yo?.rama?.toUpperCase() === 'ROVERS';
 
   if (!user && !isDevMode) return null;
 
@@ -62,7 +62,7 @@ export const JovenDashboardPage = () => {
       <SidebarJoven 
         vistaActual={vistaActual} 
         setVistaActual={setVistaActual} 
-        user={user || { nombre: 'Dev', apellido: 'Test' }} 
+        user={user || { nombre: 'Invitado', apellido: 'Prueba' }} 
         joven={yo} 
         esRover={esRover} 
         onLogout={logout} 
@@ -82,7 +82,7 @@ export const JovenDashboardPage = () => {
       >
         <Toolbar sx={{ display: { xs: 'block', sm: 'none' } }} />
 
-        {/* 🛠️ BARRA DE DESARROLLADOR */}
+        {/* 🛠️ BARRA DE DESARROLLADOR: Aparecerá mientras isDevMode sea true */}
         {isDevMode && state.scouts && state.scouts.length > 0 && (
           <Paper 
             elevation={3} 
@@ -92,11 +92,8 @@ export const JovenDashboardPage = () => {
               display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' 
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>
-              🛠️ DEV SWITCH
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              Simulando vista como:
+            <Typography variant="h6" sx={{ fontWeight: 900, fontSize: '0.9rem' }}>
+              🛠️ SIMULADOR DE PERFILES
             </Typography>
             <FormControl size="small" sx={{ minWidth: 250, bgcolor: 'white', borderRadius: 2 }}>
               <Select
@@ -106,12 +103,15 @@ export const JovenDashboardPage = () => {
                 sx={{ fontWeight: 700 }}
               >
                 {state.scouts.map(s => (
-                  <MenuItem key={s.dni} value={s.dni} sx={{ fontWeight: 600 }}>
-                    {s.nombre} {s.apellido} - {s.rama?.toUpperCase()}
+                  <MenuItem key={s.id} value={s.dni} sx={{ fontWeight: 600 }}>
+                    {s.nombre} {s.apellido} ({s.rama?.toUpperCase()})
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+            <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.9 }}>
+              ID logueado: {user?.id || 'Ninguno (Modo Local)'}
+            </Typography>
           </Paper>
         )}
         
@@ -119,6 +119,7 @@ export const JovenDashboardPage = () => {
           <Container maxWidth="md">
             <Alert severity="warning" sx={{ borderRadius: 4, fontWeight: 700, mt: 4 }}>
               Tu usuario no está vinculado a una ficha de beneficiario activa. 
+              Por favor, contactá a un educador para que asocie tu cuenta.
             </Alert>
           </Container>
         ) : (
@@ -159,7 +160,7 @@ export const JovenDashboardPage = () => {
 
             {!vistaActual && (
               <Typography variant="body1" color="text.secondary">
-                Seleccioná una opción del menú lateral para comenzar.
+                Seleccioná una opción del menú lateral para ver tu información.
               </Typography>
             )}
           </Box>

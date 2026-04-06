@@ -9,7 +9,6 @@ import { FinanzasView } from './finanzas/FinanzasView';
 import { CuotasView } from './finanzas/CuotasView'; 
 import { PresupuestoView } from './finanzas/PresupuestoView'; 
 import { AdultosView } from './adultos/AdultosView';
-// 👇 IMPORTAMOS LA NUEVA VISTA DE REVISIÓN
 import { RevisionProyectosView } from './proyectos/RevisionProyectosView';
 import { Box } from '@mui/material';
 
@@ -19,8 +18,9 @@ export const EducadorMainView = ({
   setRamaActiva, 
   ramaActiva, 
   scouts, 
+  adultos, 
   eventos, 
-  proyectos = [], // 👈 AGREGADO: Recibimos los proyectos del state global
+  proyectos = [], 
   handlers,
   userFuncion 
 }) => {
@@ -45,7 +45,7 @@ export const EducadorMainView = ({
         <DashboardView 
           scouts={scoutsFiltrados} 
           eventos={eventos} 
-          proyectos={proyectos} // 👈 Pasamos proyectos para la alerta del banner
+          proyectos={proyectos} 
           setVistaActual={setVistaActual}
           {...commonProps} 
         />
@@ -77,9 +77,15 @@ export const EducadorMainView = ({
       );
 
     case 'PLANIFICACIONES':
-      return <PlanificacionesView ramaId={ramaActiva} {...commonProps} />;
+      return (
+        <PlanificacionesView 
+          ramaId={ramaActiva} 
+          {...commonProps} 
+          scouts={esVistaGlobal ? scouts : scoutsFiltrados} 
+          adultos={adultos} 
+        />
+      );
 
-    // 👇 NUEVO CASO: REVISIÓN DE PROYECTOS (CACERÍAS / EMPRESAS)
     case 'REVISION_PROYECTOS':
       return (
         <RevisionProyectosView 
@@ -101,7 +107,14 @@ export const EducadorMainView = ({
       );
 
     case 'DOCUMENTOS': 
-      return <DocumentosView scouts={scoutsFiltrados} {...commonProps} />;
+      return (
+        <DocumentosView 
+          scouts={scoutsFiltrados} 
+          {...commonProps} 
+          // 🎯 ACÁ ESTÁ LA CONEXIÓN CLAVE
+          onUpdateScout={handlers.handleUpdateEtapa} 
+        />
+      );
 
     case 'NOTICIAS':
       return <NoticiasView {...commonProps} />;
@@ -130,3 +143,5 @@ export const EducadorMainView = ({
       );
   }
 };
+
+export default EducadorMainView;

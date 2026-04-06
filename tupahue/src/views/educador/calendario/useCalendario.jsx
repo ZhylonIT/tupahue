@@ -11,7 +11,7 @@ export const useCalendario = (eventos, ramaId, onAddEvento, onUpdateEvento, onDe
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  // 1. Detección de Vista Global y Configuración Dinámica
+  // Mantenemos la configuración visual de la rama para los botones y estilos
   const idBusqueda = ramaId?.toUpperCase();
   const esVistaGlobal = idBusqueda === 'TODAS';
   
@@ -19,25 +19,26 @@ export const useCalendario = (eventos, ramaId, onAddEvento, onUpdateEvento, onDe
     ? { nombre: 'Todo el Grupo', color: '#5A189A' } 
     : (RAMAS[idBusqueda] || RAMAS.CAMINANTES);
 
-  // 2. Efecto para adaptar la vista inicial según la pantalla
   useEffect(() => { 
     setViewMode(isMobile ? 'list' : 'grid'); 
   }, [isMobile]);
 
-  // 3. Filtrado de eventos por el mes y año que estamos viendo
+  // 🎯 FILTRADO GLOBAL: Ahora solo filtramos por FECHA. 
+  // Todos ven lo de todos para coordinar mejor.
   const eventosFiltrados = useMemo(() => {
-    return eventos.filter(ev => {
+    return (eventos || []).filter(ev => {
       if (!ev.fecha) return false;
+      
       const [year, month] = ev.fecha.split('-').map(Number);
+      // Solo filtramos que coincida el mes y el año de la vista actual
       return (month - 1) === fechaVista.getMonth() && year === fechaVista.getFullYear();
+      
     }).sort((a, b) => a.fecha.localeCompare(b.fecha));
   }, [eventos, fechaVista]);
 
-  // 4. Funciones de navegación del calendario
   const irMesAnterior = () => setFechaVista(new Date(fechaVista.getFullYear(), fechaVista.getMonth() - 1, 1));
   const irMesSiguiente = () => setFechaVista(new Date(fechaVista.getFullYear(), fechaVista.getMonth() + 1, 1));
 
-  // 5. Manejadores del Modal
   const abrirModalNuevo = () => {
     setSelectedEvent(null);
     setIsModalOpen(true);
@@ -54,8 +55,14 @@ export const useCalendario = (eventos, ramaId, onAddEvento, onUpdateEvento, onDe
     if (id) {
       onUpdateEvento(id, data);
     } else {
-      onAddEvento(data);
+      // 🎯 Al crear, guardamos qué rama lo originó, pero será visible para todos
+      const nuevoEvento = {
+        ...data,
+        rama: esVistaGlobal ? 'TODAS' : idBusqueda
+      };
+      onAddEvento(nuevoEvento);
     }
+    cerrarModal();
   };
 
   return {
@@ -69,6 +76,6 @@ export const useCalendario = (eventos, ramaId, onAddEvento, onUpdateEvento, onDe
     irMesAnterior, irMesSiguiente,
     abrirModalNuevo, abrirModalEdicion, cerrarModal,
     guardarEvento,
-    onDeleteEvento // Lo pasamos directamente
+    onDeleteEvento
   };
 };

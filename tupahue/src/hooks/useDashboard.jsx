@@ -1,259 +1,185 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
 import { useLocalStorage } from './useLocalStorage';
 import { RAMAS } from '../constants/ramas.jsx';
 import { FUNCIONES } from '../constants/auth.jsx';
 
 export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], funcionActual) => {
-  
-  // 1. LÓGICA DE PERMISOS DINÁMICA
-  const esAdminORamaUniversal = useMemo(() => {
-    const funcionesGestion = [
-      FUNCIONES.JEFE_GRUPO,
-      FUNCIONES.ASISTENTE_PROG,
-      FUNCIONES.ASISTENTE_ADULTOS,
-      FUNCIONES.ASISTENTE_COM,
-      FUNCIONES.ASISTENTE_ADM
-    ];
-    return funcionesGestion.includes(funcionActual);
-  }, [funcionActual]);
 
-  const deducirRamaDelEducador = (funcion) => {
-    if (!funcion) return 'CAMINANTES';
-    const funcUpper = funcion.toUpperCase();
-    if (funcUpper.includes('LOBATO') || funcUpper.includes('MANADA')) return 'LOBATOS';
-    if (funcUpper.includes('SCOUT') || funcUpper.includes('UNIDAD')) return 'SCOUTS';
-    if (funcUpper.includes('CAMINANTE')) return 'CAMINANTES';
-    if (funcUpper.includes('ROVER') || funcUpper.includes('CLAN')) return 'ROVERS';
-    return 'CAMINANTES'; 
-  };
-
-  // 2. ESTADOS PERSISTENTES
-  const getInitialRama = () => {
-    const saved = localStorage.getItem('tupahue_rama_actual');
-    if (saved) return JSON.parse(saved);
-    return esAdminORamaUniversal ? 'TODAS' : deducirRamaDelEducador(funcionActual);
-  };
-
-  const [ramaActiva, setRamaActiva] = useLocalStorage('tupahue_rama_actual', getInitialRama());
+  // --- 1. ESTADOS ---
+  const [ramaActiva, setRamaActiva] = useLocalStorage('tupahue_rama_actual', 'TODAS');
   const [vistaActual, setVistaActual] = useLocalStorage('tupahue_vista_actual', 'DASHBOARD');
-  const [scouts, setScouts] = useLocalStorage('tupahue_scouts', datosIniciales);
-  const [eventos, setEventos] = useLocalStorage('tupahue_eventos', eventosIniciales);
-  const [proyectos, setProyectos] = useLocalStorage('tupahue_proyectos', []);
-
-  // 3. ESTADOS DE LA INTERFAZ
+  const [scouts, setScouts] = useState([]);
+  const [eventos, setEventos] = useState([]);
+  const [proyectos, setProyectos] = useState([]);
+  const [adultos, setAdultos] = useState([]); 
+  const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [scoutSeleccionado, setScoutSeleccionado] = useState(null);
 
-  // SINCRONIZACIÓN FORZADA DE RAMA
-  useEffect(() => {
-    if (!esAdminORamaUniversal && funcionActual) {
-      const ramaCorrecta = deducirRamaDelEducador(funcionActual);
-      if (ramaActiva !== ramaCorrecta) {
-        setRamaActiva(ramaCorrecta);
-      }
-    }
-  }, [esAdminORamaUniversal, funcionActual]); 
+  const esAdminORamaUniversal = useMemo(() => {
+    const funcionesGestion = [
+      FUNCIONES.JEFE_GRUPO, FUNCIONES.ASISTENTE_PROG,
+      FUNCIONES.ASISTENTE_ADULTOS, FUNCIONES.ASISTENTE_COM, FUNCIONES.ASISTENTE_ADM
+    ];
+    return funcionesGestion.includes(funcionActual);
+  }, [funcionActual]);
 
-  // MIGRACIÓN DE DATOS DE ETAPAS
-  useEffect(() => {
-    if (scouts && scouts.length > 0) {
-      const mapeoEtapas = {
-        'busqueda': 'tierra',
-        'lobo_leal': 'cazador',
-        'sol': 'agua',
-        'servicio': 'partida'
-      };
+  // --- 2. CARGA DE DATOS ---
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // 🎯 SEGURIDAD: Si es familia, solo traemos sus hijos vinculados
+      // Si es educador/admin, trae todos.
+      let queryScouts = supabase.from('scouts').select('*');
       
-      let hayCambios = false;
-      const scoutsCorregidos = scouts.map(s => {
-        if (mapeoEtapas[s.etapa]) {
-          hayCambios = true;
-          return { ...s, etapa: mapeoEtapas[s.etapa] };
-        }
-        return s;
-      });
-
-      if (hayCambios) {
-        setScouts(scoutsCorregidos);
+      if (user.role === 'FAMILIA') {
+        queryScouts = queryScouts.eq('padre_id', user.id);
       }
-    }
-  }, [scouts, setScouts]);
 
-  // 4. HANDLERS DE LÓGICA
+      const { data: dScouts } = await queryScouts;
+      setScouts(dScouts || []);
+
+      const { data: dEv } = await supabase.from('eventos').select('*').order('fecha', { ascending: true });
+      setEventos(dEv || []);
+
+      const { data: dProy } = await supabase.from('proyectos').select('*');
+      setProyectos(dProy || []);
+
+      const { data: dAdultos } = await supabase
+        .from('profiles')
+        .select('nombre, apellido, role')
+        .or('role.eq.EDUCADOR,role.eq.ADMIN');
+      setAdultos(dAdultos || []);
+
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  }, [user]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // --- 3. HANDLERS ---
   const handlers = {
-    handleUpdateEtapa: (scoutId, nuevaEtapa) => {
-      setScouts(prev => prev.map(s => s.id === scoutId ? { ...s, etapa: nuevaEtapa } : s));
+    handleOpenForm: (scout = null) => { setScoutSeleccionado(scout); setIsFormOpen(true); },
+    handleOpenDetail: (scout) => { setScoutSeleccionado(scout); setIsDetailOpen(true); },
+
+    // 🎯 NUEVO: Vincular hijo a un padre en la DB
+    handleVincularHijo: async (dni, padreId) => {
+      // 1. Buscamos si el scout existe por DNI
+      const { data: scoutEncontrado, error: searchError } = await supabase
+        .from('scouts')
+        .select('id, nombre')
+        .eq('dni', dni)
+        .single();
+
+      if (searchError || !scoutEncontrado) throw new Error("DNI no encontrado en el sistema.");
+
+      // 2. Le asignamos el padre_id
+      const { error: updateError } = await supabase
+        .from('scouts')
+        .update({ padre_id: padreId })
+        .eq('id', scoutEncontrado.id);
+
+      if (updateError) throw updateError;
+
+      // 3. Recargamos la lista para que aparezca en el dashboard del padre
+      await fetchData();
+      return scoutEncontrado.nombre;
     },
 
-    handlePaseDeRama: (scoutId) => {
+    handleUpdateEtapa: async (scoutId, nuevaEtapa, datosExtra = {}) => {
+      const payload = { etapa: nuevaEtapa, ...datosExtra, ultimaModificacion: new Date() };
+      const { error } = await supabase.from('scouts').update(payload).eq('id', scoutId);
+      if (!error) setScouts(prev => prev.map(s => s.id === scoutId ? { ...s, ...payload } : s));
+    },
+
+    handlePaseDeRama: async (scoutId) => {
       const scout = scouts.find(s => s.id === scoutId);
       if (!scout) return;
-
       const ramaActualKey = scout.rama.toUpperCase();
       const ramaActualInfo = RAMAS[ramaActualKey];
-      
-      if (!ramaActualInfo || !ramaActualInfo.proximaRama) {
-        console.error("No se encontró información de la próxima rama para:", scout.rama);
-        return;
-      }
-
+      if (!ramaActualInfo || !ramaActualInfo.proximaRama) return;
       const proximaRamaID = ramaActualInfo.proximaRama.toUpperCase();
 
       if (proximaRamaID === 'EDUCADORES' || proximaRamaID === 'ADULTOS') {
-        setScouts(prev => prev.filter(s => s.id !== scoutId));
-        alert(`${scout.nombre} ha egresado exitosamente hacia la formación de Adultos.`);
+        const { error } = await supabase.from('scouts').delete().eq('id', scoutId);
+        if (!error) setScouts(prev => prev.filter(s => s.id !== scoutId));
       } else {
         const nuevaEtapaInicial = RAMAS[proximaRamaID].etapas[0].id;
-        
-        setScouts(prev => prev.map(s => {
-          if (s.id === scoutId) {
-            return { 
-              ...s, 
-              rama: proximaRamaID, 
-              etapa: nuevaEtapaInicial 
-            };
-          }
-          return s;
-        }));
-
-        setRamaActiva(proximaRamaID);
-        alert(`${scout.nombre} realizó el Pase a la rama ${RAMAS[proximaRamaID].nombre}`);
+        const payload = { rama: proximaRamaID, etapa: nuevaEtapaInicial, ultimaModificacion: new Date() };
+        const { error } = await supabase.from('scouts').update(payload).eq('id', scoutId);
+        if (!error) setScouts(prev => prev.map(s => s.id === scoutId ? { ...s, ...payload } : s));
       }
     },
 
-    handleToggleAsistencia: (id) => {
-      setScouts(prev => prev.map(s => s.id === id ? { ...s, presente: !s.presente } : s));
+    handleToggleAsistencia: async (id) => {
+      const scout = scouts.find(s => s.id === id);
+      const { error } = await supabase.from('scouts').update({ presente: !scout.presente }).eq('id', id);
+      if (!error) setScouts(prev => prev.map(s => s.id === id ? { ...s, presente: !s.presente } : s));
     },
 
-    handleDeleteScout: (id) => {
-      if (window.confirm("¿Estás seguro de que querés eliminar a este protagonista de la nómina?")) {
-        setScouts(prev => prev.filter(s => s.id !== id));
+    handleDeleteScout: async (id) => {
+      if (window.confirm("¿Eliminar protagonista?")) {
+        const { error } = await supabase.from('scouts').delete().eq('id', id);
+        if (!error) setScouts(prev => prev.filter(s => s.id !== id));
       }
     },
 
-    handleOpenForm: (scout = null) => {
-      setScoutSeleccionado(scout);
-      setIsFormOpen(true);
+    handleAddEvento: async (nuevo) => {
+      const ev = { ...nuevo, creadoPor: user.id };
+      const { data, error } = await supabase.from('eventos').insert([ev]).select();
+      if (!error && data) setEventos(prev => [...prev, data[0]]);
+    },
+    
+    handleUpdateEvento: async (id, datos) => {
+      const { error } = await supabase.from('eventos').update(datos).eq('id', id);
+      if (!error) setEventos(prev => prev.map(e => e.id === id ? { ...e, ...datos } : e));
     },
 
-    handleOpenDetail: (scout) => {
-      setScoutSeleccionado(scout);
-      setIsDetailOpen(true);
+    handleDeleteEvento: async (id) => {
+      const { error } = await supabase.from('eventos').delete().eq('id', id);
+      if (!error) setEventos(prev => prev.filter(e => e.id !== id));
     },
 
-    handleAddEvento: (nuevo) => {
-      setEventos(prev => [...prev, { 
-        ...nuevo, 
-        id: Date.now(),
-        color: nuevo.tipo === 'Rama' ? (RAMAS[ramaActiva]?.color || '#333') : (nuevo.color || '#333') 
-      }]);
-    },
-
-    handleDeleteEvento: (id) => {
-      setEventos(prev => prev.filter(e => e.id !== id));
-    },
-
-    handleDeleteProyecto: (id) => {
-      if (window.confirm("¿Deseas eliminar este proyecto? Se perderán todos los pasos cargados.")) {
-        setProyectos(prev => prev.filter(p => p.id !== id));
-      }
-    },
-
-    handleReviewProyecto: (proyectoId, nuevoEstado, comentarios, autoAgendar = false) => {
-      setProyectos(prev => prev.map(p => {
-        if (p.id === proyectoId) {
-          const proyActualizado = { 
-            ...p, 
-            estado: nuevoEstado, 
-            comentariosEducador: comentarios, 
-            fechaRevision: new Date(),
-            vistoPorJoven: false // Marca notificación para el joven
-          };
-
-          // LÓGICA DE AUTO-AGENDA
-          if (nuevoEstado === 'ACTIVO' && autoAgendar) {
-            handlers.handleAddEvento({
-              titulo: `INICIO: ${p.titulo}`,
-              descripcion: `Actividad de ${p.equipo} aprobada.`,
-              fecha: new Date().toISOString().split('T')[0],
-              tipo: 'Rama',
-              rama: p.rama
-            });
-          }
-          return proyActualizado;
-        }
-        return p;
-      }));
-    },
-
-    handleMarcarProyectoVisto: (proyectoId) => {
-      setProyectos(prev => prev.map(p => 
-        p.id === proyectoId ? { ...p, vistoPorJoven: true } : p
-      ));
+    handleReviewProyecto: async (proyectoId, nuevoEstado, comentarios) => {
+      const payload = { estado: nuevoEstado, comentariosEducador: comentarios, vistoPorJoven: false, ultimaModificacion: new Date() };
+      const { error } = await supabase.from('proyectos').update(payload).eq('id', proyectoId);
+      if (!error) setProyectos(prev => prev.map(p => p.id === proyectoId ? { ...p, ...payload } : p));
     }
   };
 
-  const handleSaveScout = (datosScout) => {
-    const idAEditar = datosScout.id || scoutSeleccionado?.id;
-
-    const dniDuplicado = scouts.find(s => 
-      s.dni === datosScout.dni && s.id !== idAEditar
-    );
-
-    if (dniDuplicado) {
-      alert(`ERROR: El DNI ${datosScout.dni} ya está registrado a nombre de ${dniDuplicado.nombre} ${dniDuplicado.apellido} en la rama ${dniDuplicado.rama}.`);
-      return; 
-    }
-
+  const handleSaveScout = async (datosScout) => {
+    const { id, ...payload } = datosScout;
+    const idAEditar = id || scoutSeleccionado?.id;
     if (idAEditar) {
+      await supabase.from('scouts').update(payload).eq('id', idAEditar);
       setScouts(prev => prev.map(s => s.id === idAEditar ? { ...s, ...datosScout } : s));
     } else {
-      const nuevaRama = datosScout.rama || ramaActiva;
-      const idRamaNormalizado = nuevaRama.toUpperCase();
-      
-      const nuevoScout = {
-        ...datosScout,
-        id: Date.now(),
-        presente: false,
-        rama: idRamaNormalizado,
-        etapa: RAMAS[idRamaNormalizado]?.etapas[0]?.id || 'tierra' 
-      };
-      setScouts(prev => [...prev, nuevoScout]);
+      const r = (datosScout.rama || ramaActiva).toUpperCase();
+      const nuevo = { ...payload, rama: r, etapa: RAMAS[r]?.etapas[0]?.id || 'tierra', presente: false };
+      const { data } = await supabase.from('scouts').insert([nuevo]).select();
+      if (data) setScouts(prev => [...prev, data[0]]);
     }
-    setIsFormOpen(false);
-    setScoutSeleccionado(null);
+    setIsFormOpen(false); setScoutSeleccionado(null);
   };
 
-  const handleSaveProyecto = (datosProyecto) => {
-    setProyectos(prev => {
-      const existe = prev.find(p => p.id === datosProyecto.id);
-      
-      if (existe) {
-        return prev.map(p => p.id === datosProyecto.id ? { ...p, ...datosProyecto, ultimaModificacion: new Date() } : p);
-      } else {
-        return [...prev, { 
-          ...datosProyecto, 
-          id: Date.now(), 
-          fechaCreacion: new Date(),
-          estado: datosProyecto.estado || 'BORRADOR',
-          comentariosEducador: '',
-          vistoPorJoven: true // Al crearlo ya lo está viendo
-        }];
-      }
-    });
+  const handleSaveProyecto = async (datosProyecto) => {
+    const { id, ...payload } = datosProyecto;
+    if (id) {
+      await supabase.from('proyectos').update({ ...payload, ultimaModificacion: new Date() }).eq('id', id);
+      setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...payload } : p));
+    } else {
+      const { data } = await supabase.from('proyectos').insert([{ ...payload, creadoPor: user.id, estado: 'BORRADOR' }]).select();
+      if (data) setProyectos(prev => [...prev, data[0]]);
+    }
   };
 
   return {
-    ramaActiva, setRamaActiva,
-    vistaActual, setVistaActual,
-    scouts, eventos, proyectos,
-    isFormOpen, setIsFormOpen,
-    isDetailOpen, setIsDetailOpen,
-    scoutSeleccionado,
-    esAdminORamaUniversal,
-    handlers,
-    handleSaveScout,
-    handleSaveProyecto
+    ramaActiva, setRamaActiva, vistaActual, setVistaActual,
+    scouts, eventos, proyectos, adultos, loading,
+    isFormOpen, setIsFormOpen, isDetailOpen, setIsDetailOpen,
+    scoutSeleccionado, esAdminORamaUniversal,
+    handlers, handleSaveScout, handleSaveProyecto
   };
 };

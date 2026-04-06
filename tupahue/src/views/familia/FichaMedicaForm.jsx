@@ -1,10 +1,19 @@
-import { useState } from 'react';
-import { Box, Typography, TextField, Grid, Button, Checkbox, FormControlLabel, Paper, Stack, Dialog, DialogTitle, DialogContent, DialogActions, Divider } from '@mui/material';
-import { Print, Save } from '@mui/icons-material';
+import { useState, useEffect } from 'react';
+import { 
+  Box, Typography, TextField, Grid, Button, Checkbox, 
+  FormControlLabel, Paper, Stack, Dialog, DialogTitle, 
+  DialogContent, DialogActions, Divider, CircularProgress, Alert 
+} from '@mui/material';
+import { Print, Save, Visibility, CheckCircle } from '@mui/icons-material';
 import { FichaMedicaTemplate } from './FichaMedicaTemplate';
+import { generarFichaMedicaPDF } from '../../services/pdfGeneradorFichas'; 
+import { supabase } from '../../lib/supabaseClient';
 
 export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
-  const [formData, setFormData] = useState(scout.datosMedicos || {
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const defaultMedicos = {
     fechaControl: '', domicilio: '', telEmergencia1: '', telEmergencia2: '',
     hemorragias: false, encias: false, dolorCabeza: false, presionAlta: false, presionBaja: false,
     transfusiones: false, convulsiones: false, cirugias: false, internaciones: false,
@@ -19,211 +28,233 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
     tratamientoMental: false, cualTratamientoMental: '', fobia: false,
     adjuntaCertificado: false, hablarEducador: false,
     obraSocial: '', nroCredencial: '', telObraSocial: ''
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultMedicos);
+
+  useEffect(() => {
+    if (scout?.datosMedicos) {
+      setFormData({ ...defaultMedicos, ...scout.datosMedicos });
+    } else {
+      setFormData(defaultMedicos);
+    }
+    if (open) setSuccess(false); 
+  }, [scout, open]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
   };
 
-  const handleGuardar = () => {
-    onSave({ ...scout, datosMedicos: formData });
-    onClose();
+  const handleGuardar = async (e) => {
+    if (e) e.preventDefault(); 
+    setLoading(true);
+    setSuccess(false);
+
+    try {
+      const pibeActualizado = { ...scout, datosMedicos: formData };
+      await onSave(pibeActualizado);
+
+      const pdfBlob = generarFichaMedicaPDF(pibeActualizado, true);
+      const filePath = `${scout.id}/ficha_medica/ficha_medica.pdf`;
+      const { error: storageError } = await supabase.storage
+        .from('documentos')
+        .upload(filePath, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true 
+        });
+
+      if (storageError) throw storageError;
+      setSuccess(true); 
+    } catch (error) {
+      console.error(error);
+      alert("Error al guardar la ficha.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   if (!scout) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth disableEnforceFocus>
       <DialogTitle sx={{ bgcolor: '#5A189A', color: 'white', fontWeight: 'bold' }}>
         Ficha Médica de {scout.nombre} {scout.apellido}
       </DialogTitle>
       
       <DialogContent sx={{ p: 3, bgcolor: '#f8f9fa' }} className="no-print">
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-          Completá todos los datos requeridos. Al guardar, podrás generar el PDF oficial con el formato de Scouts de Argentina.
-        </Typography>
+        {success && (
+          <Alert severity="success" sx={{ mb: 2, borderRadius: 2, fontWeight: 'bold' }}>
+            ¡Datos guardados con éxito! El legajo digital para los educadores ha sido actualizado.
+          </Alert>
+        )}
 
         <Grid container spacing={3}>
-          
-          {/* --- DATOS GENERALES --- */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>1. Datos Generales y Contacto</Typography>
+           {/* SECCIÓN 1: CONTACTO */}
+           <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 3, height: '100%', borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>1. Contacto de Emergencia</Typography>
               <Stack spacing={2}>
-                <TextField label="Fecha último control médico" size="small" name="fechaControl" value={formData.fechaControl} onChange={handleChange} fullWidth placeholder="DD/MM/AAAA" />
-                <Divider sx={{ my: 1 }} />
-                <TextField label="Domicilio Completo" size="small" name="domicilio" value={formData.domicilio} onChange={handleChange} fullWidth />
-                <TextField label="Teléfono Emergencia 1" size="small" name="telEmergencia1" value={formData.telEmergencia1} onChange={handleChange} fullWidth />
-                <TextField label="Teléfono Emergencia 2" size="small" name="telEmergencia2" value={formData.telEmergencia2} onChange={handleChange} fullWidth />
+                <TextField label="Fecha último control" size="small" name="fechaControl" value={formData.fechaControl} onChange={handleChange} fullWidth placeholder="DD/MM/AAAA" />
+                <TextField label="Domicilio Actual" size="small" name="domicilio" value={formData.domicilio} onChange={handleChange} fullWidth />
+                <TextField label="Emergencia 1 (Nombre y Tel)" size="small" name="telEmergencia1" value={formData.telEmergencia1} onChange={handleChange} fullWidth />
+                <TextField label="Emergencia 2 (Nombre y Tel)" size="small" name="telEmergencia2" value={formData.telEmergencia2} onChange={handleChange} fullWidth />
               </Stack>
             </Paper>
           </Grid>
 
-          {/* --- ANTECEDENTES Y SITUACIONES --- */}
+          {/* SECCIÓN 2: ANTECEDENTES */}
           <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>2. Antecedentes Médicos</Typography>
+            <Paper sx={{ p: 3, height: '100%', borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>2. Antecedentes</Typography>
               <Grid container>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.hemorragias} onChange={handleChange} name="hemorragias" />} label={<Typography variant="body2">Hemorragias nasales</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.encias} onChange={handleChange} name="encias" />} label={<Typography variant="body2">Sangran encías</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.dolorCabeza} onChange={handleChange} name="dolorCabeza" />} label={<Typography variant="body2">Dolor de cabeza</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.presionAlta} onChange={handleChange} name="presionAlta" />} label={<Typography variant="body2">Presión alta</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.presionBaja} onChange={handleChange} name="presionBaja" />} label={<Typography variant="body2">Presión baja</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.transfusiones} onChange={handleChange} name="transfusiones" />} label={<Typography variant="body2">Transfusiones</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.convulsiones} onChange={handleChange} name="convulsiones" />} label={<Typography variant="body2">Convulsiones</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.cirugias} onChange={handleChange} name="cirugias" />} label={<Typography variant="body2">Cirugías (último año)</Typography>} /></Grid>
-                <Grid item xs={12}><FormControlLabel control={<Checkbox size="small" checked={formData.internaciones} onChange={handleChange} name="internaciones" />} label={<Typography variant="body2">Internaciones (último año)</Typography>} /></Grid>
-              </Grid>
-              
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" fontWeight="bold">Actividad Física</Typography>
-              <Grid container>
-                <Grid item xs={12}><FormControlLabel control={<Checkbox size="small" checked={formData.actividadFisica} onChange={handleChange} name="actividadFisica" />} label={<Typography variant="body2">Realiza actividad física regularmente</Typography>} /></Grid>
-                <Grid item xs={12}><FormControlLabel control={<Checkbox size="small" checked={formData.cualquierActividad} onChange={handleChange} name="cualquierActividad" />} label={<Typography variant="body2">Puede realizar cualquier actividad</Typography>} /></Grid>
-                {(!formData.actividadFisica || !formData.cualquierActividad) && (
-                  <Grid item xs={12}>
-                    <TextField label="Especifique el motivo" size="small" name="motivoNoActividad" value={formData.motivoNoActividad} onChange={handleChange} fullWidth sx={{ mt: 1 }} />
+                {[
+                  { n: 'hemorragias', l: 'Hemorragias' },
+                  { n: 'encias', l: 'Sangran encías' },
+                  { n: 'dolorCabeza', l: 'Dolor cabeza' },
+                  { n: 'presionAlta', l: 'Presión Alta' },
+                  { n: 'presionBaja', l: 'Presión Baja' },
+                  { n: 'transfusiones', l: 'Transfusiones' },
+                  { n: 'convulsiones', l: 'Convulsiones' },
+                  { n: 'cirugias', l: 'Cirugías' },
+                  { n: 'internaciones', l: 'Internaciones' }
+                ].map((item) => (
+                  <Grid item xs={6} key={item.n}>
+                    <FormControlLabel 
+                      control={<Checkbox size="small" checked={formData[item.n] || false} onChange={handleChange} name={item.n} />} 
+                      label={<Typography variant="caption">{item.l}</Typography>} 
+                    />
                   </Grid>
-                )}
+                ))}
               </Grid>
+              <Divider sx={{ my: 1 }} />
+              <FormControlLabel control={<Checkbox size="small" checked={formData.cualquierActividad} onChange={handleChange} name="cualquierActividad" />} label={<Typography variant="body2" fontWeight="bold">Apto para cualquier actividad</Typography>} />
+              {!formData.cualquierActividad && (
+                <TextField label="Especificar restricciones" size="small" name="motivoNoActividad" value={formData.motivoNoActividad} onChange={handleChange} fullWidth sx={{ mt: 1 }} />
+              )}
             </Paper>
           </Grid>
 
-          {/* --- FÍSICO Y VACUNAS --- */}
+          {/* SECCIÓN 3: CLÍNICA Y VACUNAS */}
           <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>3. Físico y Vacunas</Typography>
-              <Stack direction="row" spacing={2} mb={2}>
-                <TextField label="Grupo" size="small" name="grupoSanguineo" value={formData.grupoSanguineo} onChange={handleChange} fullWidth />
-                <TextField label="Factor RH" size="small" name="factorRh" value={formData.factorRh} onChange={handleChange} fullWidth />
-              </Stack>
-              <Stack direction="row" spacing={2} mb={3}>
-                <TextField label="Peso (Kg)" size="small" name="peso" value={formData.peso} onChange={handleChange} fullWidth />
-                <TextField label="Talla (m)" size="small" name="talla" value={formData.talla} onChange={handleChange} fullWidth />
-              </Stack>
-              
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" fontWeight="bold" mb={1}>Fechas Últimas Dosis</Typography>
-              <Stack spacing={1.5}>
-                <TextField label="Quíntuple" size="small" name="vacunaQuintuple" value={formData.vacunaQuintuple} onChange={handleChange} fullWidth />
-                <TextField label="Triple Bacteriana Celular" size="small" name="vacunaTripleCelular" value={formData.vacunaTripleCelular} onChange={handleChange} fullWidth />
-                <TextField label="Triple Bacteriana Acelular" size="small" name="vacunaTripleAcelular" value={formData.vacunaTripleAcelular} onChange={handleChange} fullWidth />
-                <TextField label="Doble Bacteriana" size="small" name="vacunaDoble" value={formData.vacunaDoble} onChange={handleChange} fullWidth />
-              </Stack>
-              <Grid container mt={1}>
-                <Grid item xs={12}><FormControlLabel control={<Checkbox size="small" checked={formData.calendarioCompleto} onChange={handleChange} name="calendarioCompleto" />} label={<Typography variant="body2" sx={{fontWeight: 'bold', color: '#2e7d32'}}>Calendario de vacunación completo</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.noTieneVacunas} onChange={handleChange} name="noTieneVacunas" />} label={<Typography variant="body2" sx={{fontSize: '0.8rem'}}>No tiene estas vacunas</Typography>} /></Grid>
-                <Grid item xs={6}><FormControlLabel control={<Checkbox size="small" checked={formData.noSabeVacunas} onChange={handleChange} name="noSabeVacunas" />} label={<Typography variant="body2" sx={{fontSize: '0.8rem'}}>No sabe / No contesta</Typography>} /></Grid>
+            <Paper sx={{ p: 3, height: '100%', borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={1}>3. Clínica y Vacunas</Typography>
+              <Grid container spacing={1} mb={2}>
+                <Grid item xs={6}><TextField label="Grupo" size="small" name="grupoSanguineo" value={formData.grupoSanguineo} onChange={handleChange} fullWidth /></Grid>
+                <Grid item xs={6}><TextField label="RH" size="small" name="factorRh" value={formData.factorRh} onChange={handleChange} fullWidth /></Grid>
+                <Grid item xs={6}><TextField label="Peso" size="small" name="peso" value={formData.peso} onChange={handleChange} fullWidth /></Grid>
+                <Grid item xs={6}><TextField label="Talla" size="small" name="talla" value={formData.talla} onChange={handleChange} fullWidth /></Grid>
               </Grid>
+              <Typography variant="caption" fontWeight="bold">Vacunas (Año):</Typography>
+              <Grid container spacing={1}>
+                <Grid item xs={6}><TextField label="Quíntuple" size="small" name="vacunaQuintuple" value={formData.vacunaQuintuple} onChange={handleChange} fullWidth /></Grid>
+                <Grid item xs={6}><TextField label="Doble" size="small" name="vacunaDoble" value={formData.vacunaDoble} onChange={handleChange} fullWidth /></Grid>
+                <Grid item xs={6}><TextField label="Triple Cel." size="small" name="vacunaTripleCelular" value={formData.vacunaTripleCelular} onChange={handleChange} fullWidth /></Grid>
+                <Grid item xs={6}><TextField label="Triple Acel." size="small" name="vacunaTripleAcelular" value={formData.vacunaTripleAcelular} onChange={handleChange} fullWidth /></Grid>
+              </Grid>
+              <FormControlLabel control={<Checkbox size="small" checked={formData.calendarioCompleto} onChange={handleChange} name="calendarioCompleto" />} label={<Typography variant="caption" fontWeight="bold">Calendario Completo</Typography>} />
             </Paper>
           </Grid>
 
-          {/* --- CONDICIONES ESPECÍFICAS --- */}
+          {/* SECCIÓN 4: DETALLE MÉDICO COMPLETO */}
           <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>4. Condiciones Específicas y Tratamientos</Typography>
+            <Paper sx={{ p: 3, borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>4. Alergias, Medicación y Salud Mental</Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} sm={4}>
                   <FormControlLabel control={<Checkbox size="small" checked={formData.alergia} onChange={handleChange} name="alergia" />} label="Sufre alergias" />
-                  {formData.alergia && <TextField label="¿Cuáles?" size="small" name="cualAlergia" value={formData.cualAlergia} onChange={handleChange} fullWidth />}
+                  {formData.alergia && <TextField label="¿A qué?" size="small" name="cualAlergia" value={formData.cualAlergia} onChange={handleChange} fullWidth />}
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} sm={4}>
                   <FormControlLabel control={<Checkbox size="small" checked={formData.medicacion} onChange={handleChange} name="medicacion" />} label="Toma Medicación" />
-                  {formData.medicacion && <TextField label="¿Cuál?" size="small" name="cualMedicacion" value={formData.cualMedicacion} onChange={handleChange} fullWidth />}
+                  {formData.medicacion && <TextField label="Dosis/Droga" size="small" name="cualMedicacion" value={formData.cualMedicacion} onChange={handleChange} fullWidth />}
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.cronica} onChange={handleChange} name="cronica" />} label="Enfermedad Crónica" />
+                <Grid item xs={12} sm={4}>
+                  <FormControlLabel control={<Checkbox size="small" checked={formData.cronica} onChange={handleChange} name="cronica" />} label="Enf. Crónica" />
                   {formData.cronica && <TextField label="¿Cuál?" size="small" name="cualCronica" value={formData.cualCronica} onChange={handleChange} fullWidth />}
                 </Grid>
+                
+                <Grid item xs={12}><Divider /></Grid>
+
+                <Grid item xs={12} sm={4}>
+                  <FormControlLabel control={<Checkbox size="small" checked={formData.cud} onChange={handleChange} name="cud" />} label={<Typography fontWeight="bold">¿Tiene CUD?</Typography>} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <FormControlLabel control={<Checkbox size="small" checked={formData.anticoagulado} onChange={handleChange} name="anticoagulado" />} label="Anticoagulado" />
+                  {formData.anticoagulado && <TextField label="Droga" size="small" name="drogaAnticoagulante" value={formData.drogaAnticoagulante} onChange={handleChange} fullWidth />}
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <FormControlLabel control={<Checkbox size="small" checked={formData.dieta} onChange={handleChange} name="dieta" />} label="Dieta especial" />
+                  {formData.dieta && <TextField label="Especifique" size="small" name="cualDieta" value={formData.cualDieta} onChange={handleChange} fullWidth />}
+                </Grid>
+
+                <Grid item xs={12}><Divider /></Grid>
+
                 <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.tratamiento} onChange={handleChange} name="tratamiento" />} label="Requiere tratamiento" />
-                  {formData.tratamiento && <TextField label="¿Cuál?" size="small" name="cualTratamiento" value={formData.cualTratamiento} onChange={handleChange} fullWidth />}
+                  <FormControlLabel control={<Checkbox size="small" checked={formData.saludMental} onChange={handleChange} name="saludMental" />} label="Atención Salud Mental" />
+                  {formData.saludMental && <TextField label="Diagnóstico" size="small" name="cualSaludMental" value={formData.cualSaludMental} onChange={handleChange} fullWidth />}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.anticoagulado} onChange={handleChange} name="anticoagulado" />} label="Está anticoagulado" />
-                  {formData.anticoagulado && <TextField label="¿Con qué droga?" size="small" name="drogaAnticoagulante" value={formData.drogaAnticoagulante} onChange={handleChange} fullWidth />}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.dieta} onChange={handleChange} name="dieta" />} label="Régimen dietario especial" />
-                  {formData.dieta && <TextField label="¿Cuál?" size="small" name="cualDieta" value={formData.cualDieta} onChange={handleChange} fullWidth />}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.panico} onChange={handleChange} name="panico" />} label="Ataques de pánico/ansiedad" />
-                  {formData.panico && <TextField label="Indique frecuencia" size="small" name="frecuenciaPanico" value={formData.frecuenciaPanico} onChange={handleChange} fullWidth />}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.saludMental} onChange={handleChange} name="saludMental" />} label="Diagnóstico salud mental" />
-                  {formData.saludMental && <TextField label="¿Cuál?" size="small" name="cualSaludMental" value={formData.cualSaludMental} onChange={handleChange} fullWidth />}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel control={<Checkbox size="small" checked={formData.tratamientoMental} onChange={handleChange} name="tratamientoMental" />} label="Tratamiento psicológico/psiquiátrico" />
+                  <FormControlLabel control={<Checkbox size="small" checked={formData.tratamientoMental} onChange={handleChange} name="tratamientoMental" />} label="En Tratamiento" />
                   {formData.tratamientoMental && <TextField label="¿Cuál?" size="small" name="cualTratamientoMental" value={formData.cualTratamientoMental} onChange={handleChange} fullWidth />}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Stack direction="row" spacing={2} mt={1}>
-                    <FormControlLabel control={<Checkbox size="small" checked={formData.fobia} onChange={handleChange} name="fobia" />} label="Miedo excesivo / Fobia" />
-                    <FormControlLabel control={<Checkbox size="small" checked={formData.cud} onChange={handleChange} name="cud" />} label="Tiene CUD" />
-                  </Stack>
                 </Grid>
               </Grid>
             </Paper>
           </Grid>
 
-          {/* --- OBRA SOCIAL Y EXTRAS --- */}
+          {/* SECCIÓN 5: COBERTURA */}
           <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>5. Obra Social y Extras</Typography>
+            <Paper sx={{ p: 3, borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>5. Cobertura Médica</Typography>
               <Stack spacing={2}>
-                <TextField label="Obra Social o Prepaga" size="small" name="obraSocial" value={formData.obraSocial} onChange={handleChange} fullWidth />
-                <TextField label="Credencial N°" size="small" name="nroCredencial" value={formData.nroCredencial} onChange={handleChange} fullWidth />
-                <TextField label="Tel. Emergencia Obra Social" size="small" name="telObraSocial" value={formData.telObraSocial} onChange={handleChange} fullWidth />
-              </Stack>
-              <Divider sx={{ my: 3 }} />
-              <Typography variant="subtitle2" fontWeight="bold" mb={1}>Extras</Typography>
-              <Stack spacing={1}>
-                <FormControlLabel control={<Checkbox size="small" checked={formData.adjuntaCertificado} onChange={handleChange} name="adjuntaCertificado" />} label={<Typography variant="body2">Adjunta certificado de aptitud médica</Typography>} />
-                <FormControlLabel control={<Checkbox size="small" checked={formData.hablarEducador} onChange={handleChange} name="hablarEducador" />} label={<Typography variant="body2">Desea que un educador se comunique</Typography>} />
+                <TextField label="Obra Social / Prepaga" size="small" name="obraSocial" value={formData.obraSocial} onChange={handleChange} fullWidth />
+                <TextField label="N° de Afiliado" size="small" name="nroCredencial" value={formData.nroCredencial} onChange={handleChange} fullWidth />
+                <TextField label="Tel. Emergencia Cobertura" size="small" name="telObraSocial" value={formData.telObraSocial} onChange={handleChange} fullWidth />
+                <Divider />
+                <FormControlLabel control={<Checkbox size="small" checked={formData.adjuntaCertificado} onChange={handleChange} name="adjuntaCertificado" />} label={<Typography variant="caption">Adjunta Certificado Aptitud</Typography>} />
               </Stack>
             </Paper>
           </Grid>
-
         </Grid>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, className: 'no-print' }}>
-        <Button onClick={onClose} color="inherit" sx={{ fontWeight: 'bold' }}>Cancelar</Button>
-        <Button variant="contained" onClick={handleGuardar} startIcon={<Save />} sx={{ bgcolor: '#5A189A', fontWeight: 'bold' }}>
-          Guardar Datos
+      <DialogActions sx={{ p: 3, bgcolor: '#f8f9fa' }} className="no-print">
+        <Button onClick={onClose} disabled={loading} sx={{ fontWeight: 'bold' }}>Cerrar</Button>
+        <Button 
+          variant="contained" 
+          onClick={handleGuardar} 
+          disabled={loading}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (success ? <CheckCircle /> : <Save />)} 
+          sx={{ 
+            bgcolor: success ? '#4caf50' : '#5A189A', 
+            fontWeight: 'bold', px: 4, borderRadius: 2
+          }}
+        >
+          {loading ? 'Guardando...' : (success ? '¡Guardado!' : 'Guardar Cambios')}
         </Button>
-        <Button variant="outlined" onClick={handlePrint} startIcon={<Print />} color="success" sx={{ fontWeight: 'bold' }}>
-          Imprimir / Generar PDF
+        <Button variant="outlined" onClick={handlePrint} startIcon={<Visibility />} color="success" sx={{ fontWeight: 'bold', borderRadius: 2 }}>
+          Ver / Imprimir SAAC
         </Button>
       </DialogActions>
 
-      {/* --- ÁREA DE IMPRESIÓN OCULTA --- */}
       <Box className="area-imprimible" sx={{ display: 'none' }}>
         <FichaMedicaTemplate scout={scout} datosMedicos={formData} />
       </Box>
 
-      {/* --- REGLAS DE ORO DE IMPRESIÓN --- */}
-      <style>
-        {`
-          @media print {
-            @page { margin: 0; size: A4; }
-            html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: white; }
-            body * { visibility: hidden; }
-            .no-print { display: none !important; }
-            .area-imprimible { display: block !important; }
-            .area-imprimible, .area-imprimible * { visibility: visible; }
-            .area-imprimible { position: absolute; left: 0; top: 0; width: 210mm; height: 297mm; }
-          }
-        `}
-      </style>
+      <style>{`
+        @media print {
+          @page { margin: 0; size: A4; }
+          body * { visibility: hidden; }
+          .no-print { display: none !important; }
+          .area-imprimible { display: block !important; position: absolute; left: 0; top: 0; width: 210mm; }
+          .area-imprimible, .area-imprimible * { visibility: visible; }
+        }
+      `}</style>
     </Dialog>
   );
 };

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  Box, Typography, Grid, Paper, LinearProgress, Stack, 
+  Box, Typography, Grid, Paper, Stack, 
   Avatar, Chip, Container, Button, TextField, IconButton,
   List, ListItem, ListItemText, Checkbox, Divider,
-  Dialog, DialogTitle, DialogContent, DialogActions, Tooltip
+  Dialog, DialogTitle, DialogContent, DialogActions, Tooltip,
+  CircularProgress
 } from '@mui/material';
 import { 
   EmojiEvents, Flag, TipsAndUpdates, 
@@ -11,7 +12,7 @@ import {
   AddCircle, Lightbulb, TrendingUp, Close
 } from '@mui/icons-material';
 
-// Importaciones exactas a tus archivos de constantes
+import { supabase } from '../../lib/supabaseClient'; // 🎯 Importamos supabase
 import { RAMAS } from '../../constants/ramas';
 import { SENDEROS, AREAS_ROVERS, OBJETIVOS_POR_RAMA } from '../../constants/progresion';
 
@@ -25,23 +26,61 @@ export const MiProgresionView = ({ joven }) => {
   const etapaActualInfo = etapas.find(e => e.id === etapaActualId) || etapas[0];
   
   const indexEtapa = etapas.findIndex(e => e.id === etapaActualId);
-  const porcentajeGlobal = Math.round(((indexEtapa + 1) / etapas.length) * 100);
 
   // --- ESTADOS ---
   const [openSelector, setOpenSelector] = useState(false);
   const [editandoVision, setEditandoVision] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // 🎯 Estado de guardado
+
   const [visiones, setVisiones] = useState({
-    corto: joven?.visionCorto || "Escribí acá tu meta a 6 meses...",
-    mediano: joven?.visionMediano || "Escribí acá tu meta a 1 o 2 años...",
-    largo: joven?.visionLargo || "Escribí acá cómo te ves al momento de tu Partida..."
+    corto: "",
+    mediano: "",
+    largo: ""
   });
-  
-  const [misMetas, setMisMetas] = useState(joven?.metasPP || []);
+  const [misMetas, setMisMetas] = useState([]);
+
+  // 🎯 EFECTO DE SINCRONIZACIÓN (Vital para el Dev Switch)
+  useEffect(() => {
+    if (joven) {
+      setVisiones({
+        corto: joven.visionCorto || "",
+        mediano: joven.visionMediano || "",
+        largo: joven.visionLargo || ""
+      });
+      setMisMetas(joven.metasPP || []);
+    }
+  }, [joven]);
 
   const categorias = isRover ? AREAS_ROVERS : SENDEROS;
   const objetivosOficiales = OBJETIVOS_POR_RAMA[ramaId] || {};
 
   const getLogoEtapa = (id) => `/assets/images/progresiones/logo${id?.replace('_', '')}.png`;
+
+  // 🎯 FUNCIÓN PARA GUARDAR EN SUPABASE
+  const guardarCambiosProgresion = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('scouts')
+        .update({
+          visionCorto: visiones.corto,
+          visionMediano: visiones.mediano,
+          visionLargo: visiones.largo,
+          metasPP: misMetas,
+          ultimaModificacion: new Date()
+        })
+        .eq('id', joven.id);
+
+      if (error) throw error;
+      setEditandoVision(false);
+      alert("¡Tu Plan Personal se ha guardado correctamente!");
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      alert("Hubo un error al sincronizar con la nube.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const toggleMeta = (texto, catId) => {
     const existe = misMetas.find(m => m.texto === texto);
@@ -49,8 +88,21 @@ export const MiProgresionView = ({ joven }) => {
       setMisMetas(misMetas.filter(m => m.texto !== texto));
     } else {
       const catObj = categorias.find(c => c.id === catId);
-      setMisMetas([...misMetas, { texto, area: catObj?.nombre || 'General', color: catObj?.color || CONFIG_RAMA.color, completada: false }]);
+      setMisMetas([...misMetas, { 
+        texto, 
+        area: catObj?.nombre || 'General', 
+        color: catObj?.color || CONFIG_RAMA.color, 
+        completada: false 
+      }]);
     }
+  };
+
+  const handleToggleCheckMeta = (idx) => {
+    const nuevasMetas = [...misMetas];
+    nuevasMetas[idx].completada = !nuevasMetas[idx].completada;
+    setMisMetas(nuevasMetas);
+    // Guardamos automáticamente al marcar una meta como completada
+    setTimeout(guardarCambiosProgresion, 500); 
   };
 
   if (!joven) return null;
@@ -58,7 +110,7 @@ export const MiProgresionView = ({ joven }) => {
   return (
     <Container maxWidth="xl" sx={{ py: 3, animation: 'fadeIn 0.6s ease-out' }}>
       
-      {/* 1. BANNER PRINCIPAL (Más profundo y moderno) */}
+      {/* 1. BANNER PRINCIPAL */}
       <Paper 
         elevation={12} 
         sx={{ 
@@ -104,7 +156,7 @@ export const MiProgresionView = ({ joven }) => {
         </Box>
       </Paper>
 
-      {/* 2. ETAPAS DE RAMA (Rediseño: Tarjetas verticales tipo "Stepper") */}
+      {/* 2. ETAPAS DE RAMA */}
       <Box sx={{ mb: 6 }}>
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
           <Avatar sx={{ bgcolor: `${CONFIG_RAMA.color}15`, color: CONFIG_RAMA.color, width: 45, height: 45 }}>
@@ -121,20 +173,11 @@ export const MiProgresionView = ({ joven }) => {
                 <Paper 
                   elevation={esLaActual ? 8 : 1} 
                   sx={{ 
-                    p: 4, 
-                    borderRadius: 5, 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'center', 
-                    textAlign: 'center',
-                    gap: 2, 
-                    position: 'relative',
-                    overflow: 'hidden',
-                    border: esLaActual ? 'none' : '1px solid #edf2f7', 
+                    p: 4, borderRadius: 5, display: 'flex', flexDirection: 'column', 
+                    alignItems: 'center', textAlign: 'center', gap: 2, position: 'relative',
+                    overflow: 'hidden', border: esLaActual ? 'none' : '1px solid #edf2f7', 
                     background: esLaActual ? `linear-gradient(180deg, white 0%, ${CONFIG_RAMA.color}08 100%)` : '#fff', 
-                    height: '100%',
-                    transform: esLaActual ? 'translateY(-4px)' : 'none',
-                    transition: 'all 0.3s'
+                    height: '100%', transform: esLaActual ? 'translateY(-4px)' : 'none', transition: 'all 0.3s'
                   }}
                 >
                   {esLaActual && <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, bgcolor: CONFIG_RAMA.color }} />}
@@ -157,8 +200,7 @@ export const MiProgresionView = ({ joven }) => {
                       size="small"
                       label={esLaActual ? 'TRABAJANDO AQUÍ' : esCompletada ? 'LOGRADA' : 'PENDIENTE'}
                       sx={{ 
-                        fontWeight: 800, 
-                        fontSize: '0.7rem',
+                        fontWeight: 800, fontSize: '0.7rem',
                         bgcolor: esLaActual ? CONFIG_RAMA.color : esCompletada ? '#e6fffa' : '#edf2f7',
                         color: esLaActual ? 'white' : esCompletada ? '#38b2ac' : '#a0aec0',
                       }}
@@ -172,16 +214,20 @@ export const MiProgresionView = ({ joven }) => {
       </Box>
 
       <Grid container spacing={4}>
-        {/* 3. VISIÓN PERSONAL (Diseño más limpio, tipo "Post-it" moderno) */}
+        {/* 3. VISIÓN PERSONAL */}
         <Grid item xs={12} lg={4}>
           <Paper elevation={2} sx={{ p: 4, borderRadius: 6, borderTop: `6px solid ${CONFIG_RAMA.color}`, height: '100%', bgcolor: '#fff' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
               <Typography variant="h6" sx={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1.5, color: '#2d3748' }}>
-                <Psychology sx={{ color: CONFIG_RAMA.color }} /> Proyección Rover
+                <Psychology sx={{ color: CONFIG_RAMA.color }} /> Proyección Personal
               </Typography>
-              <Tooltip title={editandoVision ? "Guardar cambios" : "Editar mi visión"}>
-                <IconButton onClick={() => setEditandoVision(!editandoVision)} sx={{ bgcolor: `${CONFIG_RAMA.color}15`, color: CONFIG_RAMA.color, '&:hover': { bgcolor: `${CONFIG_RAMA.color}30` } }}>
-                  {editandoVision ? <Save /> : <Edit />}
+              <Tooltip title={editandoVision ? "Guardar mi visión" : "Editar mi visión"}>
+                <IconButton 
+                  disabled={isSaving}
+                  onClick={editandoVision ? guardarCambiosProgresion : () => setEditandoVision(true)} 
+                  sx={{ bgcolor: `${CONFIG_RAMA.color}15`, color: CONFIG_RAMA.color, '&:hover': { bgcolor: `${CONFIG_RAMA.color}30` } }}
+                >
+                  {isSaving ? <CircularProgress size={20} color="inherit" /> : editandoVision ? <Save /> : <Edit />}
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -203,7 +249,7 @@ export const MiProgresionView = ({ joven }) => {
                   ) : (
                     <Box sx={{ p: 2, bgcolor: '#f7fafc', borderRadius: 3, borderLeft: `3px solid ${CONFIG_RAMA.color}40` }}>
                       <Typography variant="body2" sx={{ color: '#4a5568', fontStyle: 'italic', fontWeight: 500, lineHeight: 1.6 }}>
-                        "{visiones[plazo]}"
+                        "{visiones[plazo] || "Sin definir..."}"
                       </Typography>
                     </Box>
                   )}
@@ -213,7 +259,7 @@ export const MiProgresionView = ({ joven }) => {
           </Paper>
         </Grid>
 
-        {/* 4. PLAN DE ACCIÓN (Tarjetas de metas más elegantes) */}
+        {/* 4. PLAN DE ACCIÓN */}
         <Grid item xs={12} lg={8}>
           <Paper elevation={2} sx={{ p: { xs: 3, md: 5 }, borderRadius: 6, height: '100%', bgcolor: '#fff' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
@@ -222,7 +268,7 @@ export const MiProgresionView = ({ joven }) => {
                   <TipsAndUpdates sx={{ color: CONFIG_RAMA.color }} /> Plan de Acción
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                  Metas seleccionadas para trabajar en este ciclo.
+                  Metas seleccionadas de los {isRover ? 'Áreas' : 'Senderos'}.
                 </Typography>
               </Box>
               <Button 
@@ -240,44 +286,35 @@ export const MiProgresionView = ({ joven }) => {
                 <Box sx={{ textAlign: 'center', py: 8, px: 2, border: '2px dashed #e2e8f0', borderRadius: 4, bgcolor: '#f7fafc' }}>
                   <Lightbulb sx={{ fontSize: 60, color: '#cbd5e0', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: '#718096', fontWeight: 800 }}>Aún no hay metas activas</Typography>
-                  <Typography variant="body2" sx={{ color: '#a0aec0' }}>Hacé clic en "Elegir Metas" para comenzar a diseñar tu Plan Personal.</Typography>
+                  <Typography variant="body2" sx={{ color: '#a0aec0' }}>Hacé clic en "Elegir Metas" para comenzar.</Typography>
                 </Box>
               ) : (
                 misMetas.map((obj, idx) => (
                   <ListItem 
                     key={idx} 
                     sx={{ 
-                      mb: 2.5, 
-                      bgcolor: obj.completada ? '#f0fff4' : '#fff', 
-                      borderRadius: 4, 
-                      border: '1px solid',
-                      borderColor: obj.completada ? '#c6f6d5' : '#e2e8f0',
+                      mb: 2.5, bgcolor: obj.completada ? '#f0fff4' : '#fff', borderRadius: 4, 
+                      border: '1px solid', borderColor: obj.completada ? '#c6f6d5' : '#e2e8f0',
                       borderLeft: `6px solid ${obj.completada ? '#48bb78' : obj.color}`,
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                      transition: '0.2s',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)', transition: '0.2s',
                       '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }
                     }}
                   >
                     <Checkbox 
                       checked={obj.completada} 
-                      onChange={() => { const n = [...misMetas]; n[idx].completada = !n[idx].completada; setMisMetas(n); }} 
+                      onChange={() => handleToggleCheckMeta(idx)} 
                       sx={{ color: '#cbd5e0', '&.Mui-checked': { color: '#48bb78' } }}
                     />
                     <ListItemText 
                       primary={obj.texto} 
                       secondary={obj.area} 
                       primaryTypographyProps={{ 
-                        fontWeight: 700, 
-                        color: obj.completada ? '#718096' : '#2d3748',
+                        fontWeight: 700, color: obj.completada ? '#718096' : '#2d3748',
                         style: { textDecoration: obj.completada ? 'line-through' : 'none' } 
                       }} 
                       secondaryTypographyProps={{ 
-                        fontWeight: 900, 
-                        color: obj.completada ? '#48bb78' : obj.color, 
-                        fontSize: '0.75rem',
-                        mt: 0.5,
-                        textTransform: 'uppercase',
-                        letterSpacing: 1
+                        fontWeight: 900, color: obj.completada ? '#48bb78' : obj.color, 
+                        fontSize: '0.75rem', mt: 0.5, textTransform: 'uppercase', letterSpacing: 1
                       }} 
                     />
                   </ListItem>
@@ -288,17 +325,17 @@ export const MiProgresionView = ({ joven }) => {
         </Grid>
       </Grid>
 
-      {/* SELECTOR DE METAS MODAL */}
+      {/* MODAL SELECTOR */}
       <Dialog open={openSelector} onClose={() => setOpenSelector(false)} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 4 } }}>
         <DialogTitle sx={{ fontWeight: 900, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f7fafc', borderBottom: '1px solid #edf2f7' }}>
           Elegir Metas Oficiales
-          <IconButton onClick={() => setOpenSelector(false)} sx={{ bgcolor: 'white', boxShadow: 1 }}><Close fontSize="small" /></IconButton>
+          <IconButton onClick={() => setOpenSelector(false)}><Close /></IconButton>
         </DialogTitle>
-        <DialogContent sx={{ bgcolor: '#fff', p: { xs: 2, md: 4 } }}>
-          {categorias && categorias.map((cat) => (
+        <DialogContent sx={{ p: { xs: 2, md: 4 } }}>
+          {categorias.map((cat) => (
             <Box key={cat.id} sx={{ mb: 5 }}>
               <Typography variant="h6" sx={{ fontWeight: 900, color: cat.color, display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, borderBottom: `2px solid ${cat.color}22`, pb: 1 }}>
-                {cat.icon} {cat.nombre}
+                {cat.nombre}
               </Typography>
               <Grid container spacing={2}>
                 {objetivosOficiales[cat.id]?.map((texto, i) => {
@@ -307,20 +344,15 @@ export const MiProgresionView = ({ joven }) => {
                     <Grid item xs={12} key={i}>
                       <Paper 
                         onClick={() => toggleMeta(texto, cat.id)} 
-                        elevation={ya ? 0 : 1}
                         sx={{ 
                           p: 2.5, cursor: 'pointer', borderRadius: 3, border: '2px solid', 
                           borderColor: ya ? cat.color : '#edf2f7', 
                           bgcolor: ya ? `${cat.color}08` : '#fff',
-                          transition: 'all 0.2s ease',
-                          '&:hover': { borderColor: cat.color, transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }
                         }}
                       >
                         <Stack direction="row" spacing={2} alignItems="center">
-                          <Checkbox disableRipple checked={!!ya} sx={{ p: 0, color: '#cbd5e0', '&.Mui-checked': { color: cat.color } }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: ya ? '#2d3748' : '#4a5568', lineHeight: 1.5 }}>
-                            {texto}
-                          </Typography>
+                          <Checkbox checked={!!ya} sx={{ color: '#cbd5e0', '&.Mui-checked': { color: cat.color } }} />
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{texto}</Typography>
                         </Stack>
                       </Paper>
                     </Grid>
@@ -330,9 +362,13 @@ export const MiProgresionView = ({ joven }) => {
             </Box>
           ))}
         </DialogContent>
-        <DialogActions sx={{ p: 3, bgcolor: '#f7fafc', borderTop: '1px solid #edf2f7' }}>
-          <Button onClick={() => setOpenSelector(false)} variant="contained" sx={{ bgcolor: CONFIG_RAMA.color, borderRadius: 3, px: 5, fontWeight: 800 }}>
-            Guardar y Cerrar
+        <DialogActions sx={{ p: 3 }}>
+          <Button 
+            onClick={() => { setOpenSelector(false); guardarCambiosProgresion(); }} 
+            variant="contained" 
+            sx={{ bgcolor: CONFIG_RAMA.color, borderRadius: 3, px: 5, fontWeight: 800 }}
+          >
+            Sincronizar Plan Personal
           </Button>
         </DialogActions>
       </Dialog>

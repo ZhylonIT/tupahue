@@ -6,7 +6,7 @@ import { generarPDFPlanificacion } from '../../../services/pdfPlanificacion';
 import { RAMAS } from '../../../constants/ramas';
 import { usePlanificaciones } from './UsePlanificaciones';
 
-export const PlanificacionesView = ({ ramaId = 'CAMINANTES' }) => {
+export const PlanificacionesView = ({ ramaId = 'CAMINANTES', scouts, adultos }) => {
   
   const {
     tabValue,
@@ -37,7 +37,13 @@ export const PlanificacionesView = ({ ramaId = 'CAMINANTES' }) => {
       </Tabs>
 
       {tabValue === 0 ? (
-        <PlanificacionEditor key={ramaId} ramaId={ramaId} onSaveSuccess={guardarPlanificacion} />
+        <PlanificacionEditor 
+          key={ramaId} 
+          ramaId={ramaId} 
+          onSaveSuccess={guardarPlanificacion} 
+          scouts={scouts}
+          adultos={adultos} // 🎯 NUEVO: Pasamos adultos al editor
+        />
       ) : (
         <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e0e0e0' }}>
           <Table>

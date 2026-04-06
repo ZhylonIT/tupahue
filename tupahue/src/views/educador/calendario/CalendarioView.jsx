@@ -6,9 +6,7 @@ import { CalendarioGrid } from './CalendarioGrid';
 import { EventoCard } from './EventoCard';
 import { EventoModal } from './EventoModal';
 
-export const CalendarioView = ({ eventos = [], onAddEvento, onUpdateEvento, onDeleteEvento, ramaId = 'CAMINANTES' }) => {
-  
-  // Toda la "inteligencia" del calendario viene desde el hook
+export const CalendarioView = ({ eventos = [], onAddEvento, onUpdateEvento, onDeleteEvento, ramaId = 'CAMINANTES' }) => {    
   const {
     viewMode, setViewMode,
     fechaVista,

@@ -3,7 +3,10 @@ import {
   Button, FormControl, Select, MenuItem, Accordion, 
   AccordionSummary, AccordionDetails, FormGroup, FormControlLabel, Checkbox, TextField 
 } from '@mui/material';
-import { Close, TrendingUp, ExpandMore, Save, VisibilityOff, FamilyRestroom } from '@mui/icons-material';
+import { 
+  Close, TrendingUp, ExpandMore, Save, VisibilityOff, 
+  FamilyRestroom, NorthEast 
+} from '@mui/icons-material';
 
 const modalStyle = {
   position: 'absolute', top: '50%', left: '50%',
@@ -38,8 +41,8 @@ export const ProgresionModal = ({
             <>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 800 }}>Evaluación</Typography>
-                  <Typography variant="body2" color="text.secondary">{scout.nombre} - {configRama.nombre}</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800 }}>Evaluación de Progresión</Typography>
+                  <Typography variant="body2" color="text.secondary">{scout.nombre} {scout.apellido} - {configRama.nombre}</Typography>
                 </Box>
                 <IconButton onClick={onClose}><Close /></IconButton>
               </Stack>
@@ -107,9 +110,31 @@ export const ProgresionModal = ({
                 </Stack>
               </Box>
 
-              <Button fullWidth variant="contained" startIcon={<Save />} onClick={onConfirmar} sx={{ bgcolor: configRama.color, borderRadius: 2, py: 1.5, fontWeight: 700 }}>
-                Guardar Progresión
-              </Button>
+              <Stack spacing={2}>
+                <Button 
+                  fullWidth 
+                  variant="contained" 
+                  startIcon={<Save />} 
+                  onClick={onConfirmar} 
+                  sx={{ bgcolor: configRama.color, borderRadius: 2, py: 1.5, fontWeight: 700, '&:hover': { bgcolor: configRama.color, opacity: 0.9 } }}
+                >
+                  Guardar Progresión
+                </Button>
+
+                {/* BOTÓN RESTAURADO: Solo visible si es la última etapa */}
+                {esUltimaEtapa && (
+                  <Button 
+                    fullWidth 
+                    variant="outlined" 
+                    color="error" 
+                    startIcon={<NorthEast />} 
+                    onClick={onPase}
+                    sx={{ borderRadius: 2, py: 1.2, fontWeight: 800, border: '2px solid' }}
+                  >
+                    REALIZAR PASE DE RAMA
+                  </Button>
+                )}
+              </Stack>
             </>
           )}
         </Box>

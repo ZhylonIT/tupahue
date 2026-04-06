@@ -1,36 +1,27 @@
 import { useState } from 'react';
-import { Box, Typography, Paper, TextField, Button, Avatar, Stack, Grid, IconButton, Alert } from '@mui/material';
+import { Box, Typography, Paper, TextField, Button, Avatar, Stack, Grid, IconButton, Alert, CircularProgress } from '@mui/material';
 import { AddBox, ArrowForwardIos, PersonSearch } from '@mui/icons-material';
 
-export const MisHijosView = ({ scoutsSistema = [], hijosVinculados = [], setDnisVinculados, onSelectHijo }) => {
+export const MisHijosView = ({ hijosVinculados = [], onVincular, onSelectHijo }) => {
   const [dniBusqueda, setDniBusqueda] = useState('');
+  const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
-  // Nos aseguramos de trabajar siempre con arrays para evitar el error de .length
-  const listaHijos = Array.isArray(hijosVinculados) ? hijosVinculados : [];
-  const listaSistema = Array.isArray(scoutsSistema) ? scoutsSistema : [];
-
-  const handleVincular = () => {
+  const handleVincular = async () => {
     setMensaje({ texto: '', tipo: '' });
-    const limpio = dniBusqueda.trim();
-    if (!limpio) return;
+    const dniLimpio = dniBusqueda.trim();
+    if (!dniLimpio) return;
 
-    const encontrado = listaSistema.find(s => String(s.dni) === limpio);
-
-    if (!encontrado) {
-      setMensaje({ texto: 'No se encontró el DNI en el sistema.', tipo: 'error' });
-      return;
-    }
-
-    if (listaHijos.some(h => String(h.dni) === limpio)) {
-      setMensaje({ texto: 'Este joven ya está en tu lista.', tipo: 'info' });
-      return;
-    }
-
-    if (setDnisVinculados) {
-      setDnisVinculados(prev => [...(Array.isArray(prev) ? prev : []), limpio]);
+    setLoading(true);
+    try {
+      // Llamamos a la función que actualiza la DB
+      const nombreHijo = await onVincular(dniLimpio);
+      setMensaje({ texto: `¡${nombreHijo} vinculado correctamente!`, tipo: 'success' });
       setDniBusqueda('');
-      setMensaje({ texto: `¡${encontrado.nombre} vinculado!`, tipo: 'success' });
+    } catch (error) {
+      setMensaje({ texto: error.message || 'Error al vincular.', tipo: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -38,63 +29,70 @@ export const MisHijosView = ({ scoutsSistema = [], hijosVinculados = [], setDnis
     <Box sx={{ animation: 'fadeIn 0.3s', maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h4" sx={{ fontWeight: 900, mb: 1 }}>Mis Hijos</Typography>
       <Typography variant="body1" color="textSecondary" sx={{ mb: 4 }}>
-        Gestioná los beneficiarios vinculados a tu cuenta.
+        Gestioná los beneficiarios vinculados a tu cuenta institucional.
       </Typography>
 
       <Paper sx={{ p: 3, borderRadius: 4, mb: 4, border: '1px solid #e1bee7' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, color: '#5A189A' }}>
-              Vincular Hijo/a (DNI)
+              Vincular por DNI
             </Typography>
             <TextField 
-              fullWidth size="small" placeholder="DNI..." 
+              fullWidth size="small" placeholder="Ingrese el DNI del joven..." 
               value={dniBusqueda} onChange={(e) => setDniBusqueda(e.target.value)}
+              disabled={loading}
               onKeyPress={(e) => e.key === 'Enter' && handleVincular()}
             />
           </Box>
-          <Button variant="contained" onClick={handleVincular} startIcon={<AddBox />} sx={{ mt: 3, bgcolor: '#5A189A' }}>
-            Vincular
+          <Button 
+            variant="contained" 
+            onClick={handleVincular} 
+            disabled={loading || !dniBusqueda}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AddBox />} 
+            sx={{ mt: 3, bgcolor: '#5A189A', fontWeight: 700 }}
+          >
+            {loading ? 'Buscando...' : 'Vincular'}
           </Button>
         </Stack>
-        {mensaje.texto && <Alert severity={mensaje.tipo} sx={{ mt: 2, borderRadius: 2 }}>{mensaje.texto}</Alert>}
+        {mensaje.texto && <Alert severity={mensaje.tipo} sx={{ mt: 2, borderRadius: 2, fontWeight: 600 }}>{mensaje.texto}</Alert>}
       </Paper>
 
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Vinculados</Typography>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Tus Beneficiarios</Typography>
       
-      {listaHijos.length === 0 ? (
+      {hijosVinculados.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '2px dashed #ccc', bgcolor: 'transparent' }}>
           <PersonSearch sx={{ fontSize: 50, color: '#ccc', mb: 2 }} />
-          <Typography color="textSecondary">No hay hijos vinculados.</Typography>
+          <Typography color="textSecondary" sx={{ fontWeight: 600 }}>No tenés hijos vinculados a esta cuenta.</Typography>
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {listaHijos.map((hijo) => (
-            <Grid item xs={12} key={hijo.dni || hijo.id}>
+          {hijosVinculados.map((hijo) => (
+            <Grid item xs={12} key={hijo.id}>
               <Paper 
                 onClick={() => onSelectHijo && onSelectHijo(hijo)}
                 sx={{ 
-                  p: 2, borderRadius: 3, transition: '0.2s', border: '1px solid #eee',
+                  p: 2.5, borderRadius: 3, transition: '0.2s', border: '1px solid #eee',
                   '&:hover': { 
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)', 
-                    transform: 'translateY(-2px)', 
+                    boxShadow: '0 8px 24px rgba(90, 24, 154, 0.1)', 
+                    transform: 'translateX(5px)', 
                     cursor: 'pointer',
                     borderColor: '#5A189A'
                   }
                 }}
               >
                 <Stack direction="row" spacing={2} alignItems="center">
-                  <Avatar sx={{ bgcolor: '#5A189A', fontWeight: 800 }}>{hijo.nombre ? hijo.nombre[0] : '?'}</Avatar>
+                  <Avatar sx={{ bgcolor: '#5A189A', fontWeight: 900 }}>{hijo.nombre[0]}</Avatar>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                       {hijo.nombre} {hijo.apellido}
                     </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      DNI: {hijo.dni} • Rama: {hijo.rama}
+                    <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 600 }}>
+                      DNI: {hijo.dni} • Rama {hijo.rama}
                     </Typography>
                   </Box>
-                  <IconButton size="small">
-                    <ArrowForwardIos fontSize="inherit" />
+                  <IconButton size="small" sx={{ color: '#5A189A' }}>
+                    <ArrowForwardIos fontSize="small" />
                   </IconButton>
                 </Stack>
               </Paper>

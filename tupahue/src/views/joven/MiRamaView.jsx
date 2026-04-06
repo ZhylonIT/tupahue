@@ -6,11 +6,12 @@ import {
 } from '@mui/material';
 import { 
   HistoryEdu, Groups as GroupsIcon, EmojiEvents, EventAvailable, 
-  AutoAwesome, CheckCircle, FormatQuote, Shield, Stars, RocketLaunch 
+  AutoAwesome, CheckCircle, FormatQuote, Shield, Stars, RocketLaunch,
+  CalendarMonth, LocationOn
 } from '@mui/icons-material';
 import { RAMAS } from '../../constants/ramas';
 
-// --- CONSTANTES DE TEXTOS OFICIALES SAAC ---
+// --- 🎯 CONSTANTES ACTUALIZADAS SEGÚN SAAC ---
 const MARCO_SIMBOLICO = {
   LOBATOS: {
     fraseMarco: "Jugar con el Pueblo Libre de los Lobos",
@@ -72,10 +73,10 @@ const MARCO_SIMBOLICO = {
   }
 };
 
-export const MiRamaView = ({ joven, proyectos = [] }) => {
+export const MiRamaView = ({ joven, proyectos = [], eventos = [] }) => {
   const theme = useTheme();
 
-  // 1. Buscamos el proyecto activo real del equipo/patrulla
+  // Filtramos el proyecto activo del joven
   const proyectoActivoReal = useMemo(() => {
     return (proyectos || []).find(p => 
       p.equipo === joven?.equipo && 
@@ -83,6 +84,18 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
       p.estado === 'ACTIVO'
     );
   }, [proyectos, joven]);
+
+  // Filtramos eventos próximos (Rama o Grupo)
+  const eventosRama = useMemo(() => {
+    const hoy = new Date().toISOString().split('T')[0];
+    return (eventos || [])
+      .filter(ev => 
+        ev.fecha >= hoy && 
+        (ev.tipo === 'GRUPAL' || ev.rama?.toUpperCase() === joven?.rama?.toUpperCase())
+      )
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .slice(0, 3);
+  }, [eventos, joven]);
 
   if (!joven) return null;
 
@@ -94,7 +107,7 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
   return (
     <Box sx={{ p: 0, pb: 6, animation: 'fadeIn 0.8s ease-out' }}>
 
-      {/* 1. BANNER DE IDENTIDAD */}
+      {/* BANNER DE IDENTIDAD */}
       <Paper
         elevation={12}
         sx={{
@@ -114,7 +127,6 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
               width: { xs: 100, md: 140 }, height: { xs: 100, md: 140 }, 
               border: '6px solid rgba(255,255,255,0.2)',
               bgcolor: 'rgba(255,255,255,0.1)', boxShadow: 10,
-              animation: 'pulse 3s infinite ease-in-out'
             }}>
               <GroupsIcon sx={{ fontSize: { xs: 50, md: 80 } }} />
             </Avatar>
@@ -126,7 +138,7 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 1 }}>
                 <Typography variant="h2" sx={{ fontWeight: 900, textTransform: 'uppercase', lineHeight: 1 }}>
-                  {joven.equipo || "Tupahue"}
+                  {joven.equipo || joven.patrulla || joven.seisena || "Tupahue"}
                 </Typography>
                 {joven.funcion && (
                   <Chip 
@@ -137,7 +149,7 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
                 )}
               </Box>
               <Typography variant="h5" sx={{ opacity: 0.9, fontWeight: 400, mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Shield sx={{ fontSize: 24 }} /> Rama {CONFIG_RAMA?.nombre} • Distrito 3 • Zona 8
+                <Shield sx={{ fontSize: 24 }} /> Rama {CONFIG_RAMA?.nombre} • Grupo Scout Tupahue
               </Typography>
             </Box>
           </Grid>
@@ -145,10 +157,9 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
       </Paper>
 
       <Grid container spacing={4}>
-
-        {/* 2. MARCO SIMBÓLICO */}
+        {/* COLUMNA IZQUIERDA: MÍSTICA */}
         <Grid item xs={12} md={7}>
-          <Card elevation={4} sx={{ borderRadius: 6, border: '1px solid #edf2f7' }}>
+          <Card elevation={4} sx={{ borderRadius: 6, height: '100%' }}>
             <CardContent sx={{ p: 5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, gap: 2 }}>
                 <HistoryEdu sx={{ color: colorPrincipal, fontSize: 36 }} />
@@ -157,33 +168,26 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
 
               <Box sx={{ mb: 6, textAlign: 'center', bgcolor: `${colorPrincipal}08`, p: 4, borderRadius: 6, border: `1px dashed ${colorPrincipal}44` }}>
                 <AutoAwesome sx={{ color: colorPrincipal, mb: 1, fontSize: 32 }} />
-                <Typography variant="h3" sx={{ fontWeight: 900, fontStyle: 'italic', color: 'text.primary', lineHeight: 1.2, mb: 1 }}>
+                <Typography variant="h3" sx={{ fontWeight: 900, fontStyle: 'italic', lineHeight: 1.2 }}>
                   "{infoSimbolica.fraseMarco}"
                 </Typography>
               </Box>
 
-              <Box sx={{ position: 'relative', mb: 6 }}>
-                <FormatQuote sx={{ position: 'absolute', top: -25, left: -10, fontSize: 100, color: colorPrincipal, opacity: 0.1 }} />
-                <Box sx={{ p: 4, borderRadius: 4, bgcolor: '#f8fafc', borderLeft: `10px solid ${colorPrincipal}`, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-                  <Typography variant="overline" sx={{ fontWeight: 900, color: colorPrincipal, mb: 1, display: 'block', letterSpacing: 2 }}>NUESTRA PROMESA</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.6, color: '#1e293b' }}>
-                    {infoSimbolica.promesa.replace("(nombre)", joven.nombre)}
-                  </Typography>
-                </Box>
+              <Box sx={{ p: 4, borderRadius: 4, bgcolor: '#f8fafc', borderLeft: `10px solid ${colorPrincipal}`, mb: 6 }}>
+                <Typography variant="overline" sx={{ fontWeight: 900, color: colorPrincipal }}>NUESTRA PROMESA</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.6 }}>
+                  {infoSimbolica.promesa.replace("(nombre)", joven.nombre)}
+                </Typography>
               </Box>
 
-              <Typography variant="h6" sx={{ fontWeight: 900, mb: 3, textTransform: 'uppercase', color: 'text.secondary', letterSpacing: 1 }}>
-                La Ley de la {ramaKey.charAt(0) + ramaKey.slice(1).toLowerCase()}
-              </Typography>
-              <List sx={{ display: 'grid', gap: 1.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 900, mb: 3, color: 'text.secondary' }}>LA LEY SCOUT</Typography>
+              <List>
                 {infoSimbolica.ley.map((punto, index) => (
-                  <ListItem key={index} disablePadding sx={{ transition: '0.3s', '&:hover': { transform: 'translateX(10px)' } }}>
+                  <ListItem key={index} disablePadding sx={{ mb: 1.5 }}>
                     <ListItemIcon sx={{ minWidth: 40 }}>
-                      <CheckCircle sx={{ color: colorPrincipal, fontSize: 24 }} />
+                      <CheckCircle sx={{ color: colorPrincipal }} />
                     </ListItemIcon>
-                    <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.15rem', color: '#334155' }}>
-                      {punto}
-                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{punto}</Typography>
                   </ListItem>
                 ))}
               </List>
@@ -191,105 +195,56 @@ export const MiRamaView = ({ joven, proyectos = [] }) => {
           </Card>
         </Grid>
 
-        {/* 3. PROYECTO Y MEMBRESÍA */}
+        {/* COLUMNA DERECHA: PROYECTOS Y EVENTOS */}
         <Grid item xs={12} md={5}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-
-            {/* CARD DE PROYECTO (CONECTADA) */}
-            <Card 
-              elevation={8} 
-              sx={{ 
-                borderRadius: 6, 
-                bgcolor: '#1a1a1a', 
-                color: '#fff', 
-                overflow: 'hidden',
-                border: proyectoActivoReal ? `2px solid ${colorPrincipal}` : 'none'
-              }}
-            >
-              <Box sx={{ bgcolor: colorPrincipal, height: 10 }} />
+          <Stack spacing={4}>
+            {/* CARD DE PROYECTO ACTUAL */}
+            <Card sx={{ borderRadius: 6, bgcolor: '#1a1a1a', color: '#fff', borderLeft: `6px solid ${colorPrincipal}` }}>
               <CardContent sx={{ p: 4 }}>
                 <Stack spacing={2}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <RocketLaunch sx={{ color: colorPrincipal, fontSize: 40 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                      {infoSimbolica.proyectoNombre} Actual
-                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{infoSimbolica.proyectoNombre} Actual</Typography>
                   </Box>
-
-                  <Typography variant="h3" sx={{ fontWeight: 900, color: colorPrincipal, lineHeight: 1.1 }}>
-                    {proyectoActivoReal 
-                      ? proyectoActivoReal.titulo 
-                      : `¡Es hora de soñar tu próximo ${infoSimbolica.proyectoNombre}!`}
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: colorPrincipal }}>
+                    {proyectoActivoReal ? proyectoActivoReal.titulo : `¡Elegí tu próximo ${infoSimbolica.proyectoNombre}!`}
                   </Typography>
-
-                  <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', my: 2 }} />
-                  
-                  <Typography variant="body1" sx={{ opacity: 0.8, fontWeight: 500 }}>
-                    {proyectoActivoReal 
-                      ? "En plena ejecución. ¡A seguir trabajando por el objetivo!" 
-                      : "Reunite con tu pequeño grupo y empezá a planificar una nueva aventura."}
+                  <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                    {proyectoActivoReal ? "Tu equipo está en marcha." : "Reunite con tu grupo para proponer un nuevo desafío."}
                   </Typography>
                 </Stack>
               </CardContent>
             </Card>
 
-            {/* MEMBRESÍA (SÓLO PERMANENCIA POR AHORA) */}
-            <Card elevation={4} sx={{ borderRadius: 6, border: '1px solid #edf2f7' }}>
+            {/* CARD DE PRÓXIMAS ACTIVIDADES */}
+            <Card sx={{ borderRadius: 6 }}>
               <CardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, gap: 2 }}>
-                  <EventAvailable sx={{ color: colorPrincipal, fontSize: 36 }} />
-                  <Typography variant="h5" sx={{ fontWeight: 900 }}>Membresía Tupahue</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
+                  <CalendarMonth sx={{ color: colorPrincipal, fontSize: 32 }} />
+                  <Typography variant="h5" sx={{ fontWeight: 900 }}>Próximas Citas</Typography>
                 </Box>
-                
-                <Grid container spacing={4}>
-                  <Grid item xs={12}>
-                    <Paper 
-                      variant="outlined" 
-                      sx={{ 
-                        p: 3, borderRadius: 4, display: 'flex', 
-                        alignItems: 'center', justifyContent: 'space-between', 
-                        bgcolor: '#f8fafc' 
-                      }}
-                    >
-                      <Box>
-                        <Typography variant="h3" sx={{ fontWeight: 900, color: '#1e293b' }}>
-                          {joven.permanencia || "1"}
-                        </Typography>
-                        <Typography variant="button" sx={{ fontWeight: 800, color: 'text.secondary' }}>
-                          Años en el Grupo
-                        </Typography>
-                      </Box>
-                      <Avatar sx={{ bgcolor: colorPrincipal, width: 56, height: 56 }}>
-                        <Shield sx={{ fontSize: 32 }} />
-                      </Avatar>
-                    </Paper>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic', textAlign: 'center', display: 'block' }}>
-                      * El registro de asistencia estará disponible en una próxima actualización vinculada al calendario.
-                    </Typography>
-                  </Grid>
-                </Grid>
+                <Stack spacing={2}>
+                  {eventosRama.length > 0 ? (
+                    eventosRama.map((ev) => (
+                      <Paper key={ev.id} variant="outlined" sx={{ p: 2, borderRadius: 4, bgcolor: '#f8fafc' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: colorPrincipal }}>{ev.titulo}</Typography>
+                        <Stack direction="row" spacing={2} sx={{ mt: 1, opacity: 0.7 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <EventAvailable sx={{ fontSize: 14 }} />
+                            <Typography variant="caption">{ev.fecha}</Typography>
+                          </Box>
+                        </Stack>
+                      </Paper>
+                    ))
+                  ) : (
+                    <Typography variant="body2" sx={{ fontStyle: 'italic', textAlign: 'center' }}>No hay eventos agendados.</Typography>
+                  )}
+                </Stack>
               </CardContent>
             </Card>
-
-          </Box>
+          </Stack>
         </Grid>
-
       </Grid>
-
-      <style>{`
-        @keyframes pulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-          100% { transform: scale(1); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </Box>
   );
 };

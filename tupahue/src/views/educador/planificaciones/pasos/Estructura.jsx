@@ -6,10 +6,12 @@ import {
 } from '@mui/material';
 import { Sync, Groups, WarningAmber, Edit, Save, Assignment, Analytics, Public } from '@mui/icons-material';
 
-export const PasoEstructura = ({ ramaId, data, setData }) => {
+// 🎯 Ahora recibimos 'scouts' como prop desde el PlanificacionEditor
+export const PasoEstructura = ({ ramaId, data, setData, scouts }) => {
   const [editMode, setEditMode] = useState(false);
   const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS';
 
+  // Mantenemos la persistencia del borrador de texto para no perder lo escrito al navegar
   useEffect(() => {
     const savedData = localStorage.getItem(`planif_estructura_${ramaId}`);
     if (savedData) {
@@ -23,6 +25,7 @@ export const PasoEstructura = ({ ramaId, data, setData }) => {
   const handleChange = (field, value) => {
     setData(prev => {
       const newData = { ...prev, [field]: value };
+      // Guardamos borrador local
       localStorage.setItem(`planif_estructura_${ramaId}`, JSON.stringify({
         planRama: newData.planRama,
         diagnostico: newData.diagnostico,
@@ -33,12 +36,11 @@ export const PasoEstructura = ({ ramaId, data, setData }) => {
   };
 
   const sincronizarNomina = () => {
-    const storageKey = 'tupahue_scouts';
-    const nominaRaw = localStorage.getItem(storageKey);
-
-    if (nominaRaw) {
+    // 🎯 DESCONEXIÓN DEL PASADO:
+    // En lugar de leer 'tupahue_scouts' del localStorage, usamos la prop 'scouts'
+    if (scouts && scouts.length > 0) {
       try {
-        const todosLosScouts = JSON.parse(nominaRaw);
+        const todosLosScouts = scouts;
         
         // Si es vista global trae a todos. Si no, filtra por la rama actual.
         const beneficiarios = esVistaGlobal 
@@ -63,7 +65,7 @@ export const PasoEstructura = ({ ramaId, data, setData }) => {
           const funcion = (p.funcion || p.cargo || '').toLowerCase().trim();
           const nombreCompleto = `${p.nombre} ${p.apellido}`;
 
-          // Para eventos globales no discriminamos guías, todos son integrantes de la unidad
+          // Lógica de asignación por funciones
           if (esVistaGlobal) {
             acc[nombreColumna].integrantes.push(nombreCompleto);
           } else {
@@ -80,30 +82,31 @@ export const PasoEstructura = ({ ramaId, data, setData }) => {
 
         const finalEquipos = Object.values(agrupados);
         
+        // Actualizamos el estado global de la planificación
         setData(prev => ({ ...prev, equipos: finalEquipos }));
         
+        // Sincronizamos el borrador local para coherencia
         const currentSaved = JSON.parse(localStorage.getItem(`planif_estructura_${ramaId}`) || '{}');
         localStorage.setItem(`planif_estructura_${ramaId}`, JSON.stringify({
           ...currentSaved,
           equipos: finalEquipos
         }));
 
-        alert("¡Nómina sincronizada con éxito!");
+        alert("¡Nómina sincronizada con éxito desde Supabase!");
 
       } catch (error) {
         console.error("Error al sincronizar", error);
         alert("Error al procesar los datos de la nómina.");
       }
     } else {
-      alert("Cargá los protagonistas en la Nómina primero.");
+      alert("No hay datos de nómina disponibles. Asegurate de que los scouts estén cargados.");
     }
   };
 
   const esRamaConPatrullas = ['SCOUTS', 'CAMINANTES'].includes(ramaId?.toUpperCase());
 
-  // Calculamos dinámicamente cuántas filas necesitamos para que no quede nadie afuera
   const maxIntegrantes = (data.equipos && data.equipos.length > 0)
-    ? Math.max(...data.equipos.map(eq => eq.integrantes.length), 6) // Mínimo 6 filas para que quede prolijo
+    ? Math.max(...data.equipos.map(eq => eq.integrantes.length), 6)
     : 6;
   const arrayIntegrantes = Array.from({ length: maxIntegrantes }, (_, i) => i);
 
@@ -194,7 +197,6 @@ export const PasoEstructura = ({ ramaId, data, setData }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {/* Ocultamos las filas de Guía/Subguía si es evento global */}
                   {!esVistaGlobal && (
                     <>
                       <TableRow>
@@ -212,7 +214,6 @@ export const PasoEstructura = ({ ramaId, data, setData }) => {
                     </>
                   )}
                   
-                  {/* Filas dinámicas de integrantes */}
                   {arrayIntegrantes.map((idx) => (
                     <TableRow key={idx}>
                       <TableCell sx={{ color: 'text.disabled', fontSize: '0.65rem' }}>

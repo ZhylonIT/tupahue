@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { RAMAS } from '../../../constants/ramas';
-import { useLocalStorage } from '../../../hooks/useLocalStorage';
 
 export const useProgresion = (scouts, ramaId, onUpdateEtapa, onPaseDeRama) => {
   const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS';
@@ -12,9 +11,6 @@ export const useProgresion = (scouts, ramaId, onUpdateEtapa, onPaseDeRama) => {
   const [filterText, setFilterText] = useState("");
   const [scoutSeleccionado, setScoutSeleccionado] = useState(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
-
-  // Key de persistencia para los checks de objetivos (se mantiene igual)
-  const [objetivosCumplidos, setObjetivosCumplidos] = useLocalStorage('tupahue_progresion_objetivos', {});
   
   const [tempEtapa, setTempEtapa] = useState('');
   const [tempObjetivos, setTempObjetivos] = useState({});
@@ -29,47 +25,57 @@ export const useProgresion = (scouts, ramaId, onUpdateEtapa, onPaseDeRama) => {
     });
   }, [scouts, esVistaGlobal, filterText, idBusqueda]);
 
+  // 🎯 NUEVO: Calculamos los próximos pases leyendo la última etapa de cada rama
+  const proximosPases = useMemo(() => {
+    return scoutsFiltrados.filter(s => {
+      if (!s.etapa) return false;
+      const ramaScout = RAMAS[s.rama?.toUpperCase()];
+      if (!ramaScout || !ramaScout.etapas || ramaScout.etapas.length === 0) return false;
+      return s.etapa === ramaScout.etapas[ramaScout.etapas.length - 1].id;
+    });
+  }, [scoutsFiltrados]);
+
   useEffect(() => {
     if (scoutSeleccionado) {
       setTempEtapa(scoutSeleccionado.etapa || CONFIG_RAMA.etapas[0].id);
-      setTempObjetivos({ ...objetivosCumplidos });
-      setTempObsInterna(scoutSeleccionado.progresion?.obsInterna || '');
-      setTempObsPadres(scoutSeleccionado.progresion?.obsPadres || '');
+      
+      // 🎯 MAGIA SUPABASE: Leemos el array de la DB y lo pasamos al formato de tu UI (Diccionario)
+      const objetivosDB = scoutSeleccionado.objetivos_logrados || [];
+      const objMap = {};
+      objetivosDB.forEach(obj => {
+        objMap[`${scoutSeleccionado.id}-${obj}`] = true;
+      });
+      setTempObjetivos(objMap);
+      
+      setTempObsInterna(scoutSeleccionado.observaciones || '');
+      setTempObsPadres(scoutSeleccionado.observacionesFamilia || '');
     }
-  }, [scoutSeleccionado, CONFIG_RAMA, objetivosCumplidos]);
+  }, [scoutSeleccionado, CONFIG_RAMA]);
 
   const handleToggleObjetivo = (scoutId, objetivo) => {
     const key = `${scoutId}-${objetivo}`;
     setTempObjetivos(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleConfirmarCambios = () => {
-    // 1. Preparamos el array de objetivos logrados para guardar dentro del scout
-    const objetivosIds = Object.keys(tempObjetivos)
-      .filter(key => key.startsWith(`${scoutSeleccionado.id}-`) && tempObjetivos[key])
-      .map(key => key.replace(`${scoutSeleccionado.id}-`, ''));
+  const handleConfirmarCambios = async () => {
+    try {
+      // 1. Convertimos el diccionario de la UI de vuelta a un Array limpio para Supabase
+      const objetivosArray = Object.keys(tempObjetivos)
+        .filter(key => key.startsWith(`${scoutSeleccionado.id}-`) && tempObjetivos[key])
+        .map(key => key.replace(`${scoutSeleccionado.id}-`, ''));
 
-    // 2. CREAMOS LA DATA DE PROGRESIÓN
-    const dataProgresion = {
-      ...scoutSeleccionado.progresion,
-      objetivos: objetivosIds,
-      obsInterna: tempObsInterna,
-      obsPadres: tempObsPadres
-    };
+      // 2. LLAMADA AL MOTOR DE SUPABASE (a través de tu prop onUpdateEtapa)
+      await onUpdateEtapa(scoutSeleccionado.id, tempEtapa, {
+        observaciones: tempObsInterna,
+        observacionesFamilia: tempObsPadres,
+        objetivos_logrados: objetivosArray 
+      });
 
-    // 3. ACTUALIZACIÓN QUIRÚRGICA: 
-    // Inyectamos la data en el objeto scout antes de mandarlo al handler global.
-    // Esto asegura que aunque onUpdateEtapa solo sepa manejar etapa, 
-    // el objeto scout ya lleve las observaciones puestas cuando se guarde en LocalStorage.
-    scoutSeleccionado.progresion = dataProgresion;
-    
-    // Llamamos al handler original del sistema
-    onUpdateEtapa(scoutSeleccionado.id, tempEtapa);
-
-    // 4. Persistencia de UI y checks
-    setObjetivosCumplidos(tempObjetivos);
-    setOpenSnackbar(true);
-    setScoutSeleccionado(null);
+      setOpenSnackbar(true);
+      setScoutSeleccionado(null);
+    } catch (error) {
+      alert("No se pudo guardar la progresión: " + error.message);
+    }
   };
 
   const handlePase = () => {
@@ -85,7 +91,7 @@ export const useProgresion = (scouts, ramaId, onUpdateEtapa, onPaseDeRama) => {
     filterText, setFilterText,
     scoutSeleccionado, setScoutSeleccionado,
     openSnackbar, setOpenSnackbar,
-    scoutsFiltrados,
+    scoutsFiltrados, proximosPases,
     tempEtapa, setTempEtapa,
     tempObjetivos, handleToggleObjetivo,
     tempObsInterna, setTempObsInterna,

@@ -11,10 +11,7 @@ import { ContactoPage } from './pages/ContactoPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { FamiliaDashboardPage } from './pages/FamiliaDashboardPage'; 
-
-// 👇 IMPORTAMOS LA NUEVA PÁGINA DEL JOVEN
 import { JovenDashboardPage } from './pages/JovenDashboardPage'; 
-
 import { QueHacemosPage } from './pages/QueHacemosPage'; 
 import { NoticiasPage } from './pages/NoticiasPage'; 
 import { NoticiaDetallePage } from './pages/NoticiaDetallePage'; 
@@ -22,7 +19,6 @@ import { CssBaseline, Box, createTheme, ThemeProvider, CircularProgress } from '
 import { Footer } from './components/footer';
 import { ScrollToTop } from './components/ScrollToTop';
 
-// IMPORTAMOS EL CONTEXTO
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 const theme = createTheme({
@@ -30,16 +26,33 @@ const theme = createTheme({
   palette: { primary: { main: '#5A189A' } },
 });
 
-// --- COMPONENTE PARA PROTEGER RUTAS ---
+// --- 🎯 REDIRECCIONADOR INTELIGENTE POR ROL ---
+const DashboardRedirect = () => {
+  const { user, authLoading } = useAuth();
+
+  if (authLoading) return null; // El ProtectedRoute ya maneja el loading
+  if (!user) return <Navigate to="/login" />;
+
+  // Según el rol en la DB, mandamos a la sub-ruta correcta
+  if (user.role === 'ADMIN' || user.role === 'EDUCADOR') {
+    return <Navigate to="/dashboard/educador" />;
+  }
+  if (user.role === 'JOVEN') {
+    return <Navigate to="/dashboard/joven" />;
+  }
+  if (user.role === 'FAMILIA') {
+    return <Navigate to="/dashboard/familia" />;
+  }
+
+  return <Navigate to="/" />;
+};
+
 const ProtectedRoute = ({ children }) => {
   const { user, authLoading } = useAuth();
-  const isDevMode = true; // Mantenemos tu modo desarrollador activo
-
-  if (isDevMode) return children;
-
+  
   if (authLoading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <CircularProgress />
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: '#f4f7f6' }}>
+      <CircularProgress color="primary" />
     </Box>
   );
 
@@ -49,8 +62,6 @@ const ProtectedRoute = ({ children }) => {
 
 const LayoutManager = () => {
   const location = useLocation();
-  
-  // Detectamos si es dashboard para ocultar Navbar/Footer
   const isDashboard = location.pathname.includes('/dashboard');
 
   return (
@@ -65,7 +76,6 @@ const LayoutManager = () => {
         }}
       >
         <Routes>
-          {/* --- RUTAS PÚBLICAS --- */}
           <Route path="/" element={<HomePage />} />
           <Route path="/historia" element={<HistoriaPage />} />          
           <Route path="/que-hacemos" element={<QueHacemosPage />} />          
@@ -79,12 +89,11 @@ const LayoutManager = () => {
           <Route path="/contacto" element={<ContactoPage />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* --- RUTAS PRIVADAS --- */}
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/dashboard/educador" element={<ProtectedRoute><DashboardPage userRole="educador" /></ProtectedRoute>} />
-          <Route path="/dashboard/familia" element={<ProtectedRoute><FamiliaDashboardPage /></ProtectedRoute>} /> 
+          {/* 🎯 Ruta base del dashboard: ahora usa el Redireccionador */}
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardRedirect /></ProtectedRoute>} />
           
-          {/* 👇 NUEVA RUTA CONECTADA PARA EL JOVEN */}
+          <Route path="/dashboard/educador" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/dashboard/familia" element={<ProtectedRoute><FamiliaDashboardPage /></ProtectedRoute>} /> 
           <Route path="/dashboard/joven" element={<ProtectedRoute><JovenDashboardPage /></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/" />} />

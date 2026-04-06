@@ -1,75 +1,86 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../../../lib/supabaseClient';
+import { useAuth } from '../../../context/AuthContext';
 
 export const usePlanificaciones = (ramaId) => {
+  const { user } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [historial, setHistorial] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
   const esVistaGlobal = ramaId?.toUpperCase() === 'TODAS';
 
-  // Función para cargar el historial (la sacamos a una función para reusarla)
-  const cargarHistorial = useCallback(() => {
-    if (esVistaGlobal) {
-      const ramasNombres = ['LOBATOS', 'SCOUTS', 'CAMINANTES', 'ROVERS', 'TODAS'];
-      let historialCombinado = [];
+  // CARGAR HISTORIAL DESDE SUPABASE
+  const cargarHistorial = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    
+    try {
+      let query = supabase.from('planificaciones').select('*');
 
-      ramasNombres.forEach(nombreRama => {
-        const storageKey = `tupahue_historial_planificaciones_${nombreRama}`;
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          const planificacionesRama = JSON.parse(saved).map(plani => ({
-            ...plani,
-            ramaOrigen: nombreRama
-          }));
-          historialCombinado = [...historialCombinado, ...planificacionesRama];
-        }
-      });
+      // Si no es vista global, filtramos por la rama actual
+      if (!esVistaGlobal) {
+        query = query.eq('rama', ramaId.toUpperCase());
+      }
 
-      historialCombinado.sort((a, b) => b.id - a.id);
-      setHistorial(historialCombinado);
-      setTabValue(1); 
-    } else {
-      const storageKey = `tupahue_historial_planificaciones_${ramaId.toUpperCase()}`;
-      const saved = localStorage.getItem(storageKey);
-      setHistorial(saved ? JSON.parse(saved) : []);
-      setTabValue(0);
+      const { data, error } = await query.order('createdAt', { ascending: false });
+
+      if (error) throw error;
+
+      // Mapeamos para mantener compatibilidad con la tabla de la View
+      const historialMapeado = data.map(plani => ({
+        ...plani,
+        ramaOrigen: plani.rama // para que el Chip de la vista global funcione
+      }));
+
+      setHistorial(historialMapeado);
+    } catch (error) {
+      console.error("Error al cargar planificaciones:", error.message);
+    } finally {
+      setLoading(false);
     }
-  }, [ramaId, esVistaGlobal]);
+  }, [ramaId, esVistaGlobal, user]);
 
   useEffect(() => {
     cargarHistorial();
   }, [cargarHistorial]);
 
-  const guardarPlanificacion = (nuevaPlanificacion) => {
-    const nuevoRegistro = {
-      id: Date.now(),
-      fecha: nuevaPlanificacion.fechaActividad || new Date().toLocaleDateString(),
-      nombre: nuevaPlanificacion.nombreActividad || 'Actividad Planificada',
-      ciclo: nuevaPlanificacion.cicloPrograma || 'Sin asignar',
-      datos: nuevaPlanificacion
-    };
+  // GUARDAR EN SUPABASE
+  const guardarPlanificacion = async (nuevaPlanificacion) => {
+    try {
+      const nuevoRegistro = {
+        fecha: nuevaPlanificacion.fechaActividad || new Date().toLocaleDateString(),
+        nombre: nuevaPlanificacion.nombreActividad || 'Actividad Planificada',
+        ciclo: nuevaPlanificacion.cicloPrograma || 'Sin asignar',
+        rama: ramaId.toUpperCase(),
+        datos: nuevaPlanificacion,
+        creadoPor: user.id
+      };
 
-    const storageKey = `tupahue_historial_planificaciones_${ramaId.toUpperCase()}`;
-    const saved = localStorage.getItem(storageKey);
-    const historialActual = saved ? JSON.parse(saved) : [];
-    
-    const nuevoHistorial = [nuevoRegistro, ...historialActual];
-    localStorage.setItem(storageKey, JSON.stringify(nuevoHistorial));
+      const { error } = await supabase.from('planificaciones').insert([nuevoRegistro]);
 
-    // Recargamos todo el estado
-    cargarHistorial();
-    setTabValue(1);
+      if (error) throw error;
+
+      // Recargamos y saltamos a la pestaña de historial
+      await cargarHistorial();
+      setTabValue(1);
+    } catch (error) {
+      alert("Error al guardar planificación: " + error.message);
+    }
   };
 
-  const eliminarPlanificacion = (id, ramaOrigen = null) => {
-    if (window.confirm("¿Estás seguro de que querés eliminar esta planificación del historial?")) {
-      const ramaABorrar = esVistaGlobal ? ramaOrigen : ramaId.toUpperCase();
-      const storageKey = `tupahue_historial_planificaciones_${ramaABorrar}`;
+  // ELIMINAR DE SUPABASE
+  const eliminarPlanificacion = async (id) => {
+    if (!window.confirm("¿Estás seguro de eliminar esta planificación?")) return;
+
+    try {
+      const { error } = await supabase.from('planificaciones').delete().eq('id', id);
       
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const historialRama = JSON.parse(saved).filter(item => item.id !== id);
-        localStorage.setItem(storageKey, JSON.stringify(historialRama));
-      }
-      cargarHistorial();
+      if (error) throw error;
+      
+      setHistorial(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      alert("Error al eliminar: " + error.message);
     }
   };
 
@@ -77,6 +88,7 @@ export const usePlanificaciones = (ramaId) => {
     tabValue,
     setTabValue,
     historial,
+    loading,
     esVistaGlobal,
     guardarPlanificacion,
     eliminarPlanificacion

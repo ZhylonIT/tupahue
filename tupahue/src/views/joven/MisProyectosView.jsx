@@ -3,12 +3,13 @@ import {
   Box, Typography, Card, CardContent, Stepper, Step, StepLabel, 
   Button, TextField, Paper, Chip, Divider, Stack, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Avatar, IconButton, Alert, Tooltip, Container
+  Avatar, IconButton, Alert, Tooltip, Container, CircularProgress
 } from '@mui/material';
 import { 
   RocketLaunch, FactCheck, Save, Send, Construction, 
   AddCircle, Visibility, Edit, Message,
-  History, Download, DeleteOutline, WarningAmber, TaskAlt
+  History, Download, DeleteOutline, WarningAmber, TaskAlt,
+  Feedback
 } from '@mui/icons-material';
 
 import { generarPDFProyecto } from '../../services/pdfProyectos';
@@ -26,9 +27,12 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
   const [modoEdicion, setModoEdicion] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [proyectoParaFinalizar, setProyectoParaFinalizar] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const ramaId = joven?.rama?.toUpperCase() || 'SCOUTS';
   const CONFIG_RAMA = RAMAS[ramaId] || RAMAS.SCOUTS;
+  
+  // 🎯 TERMINOLOGÍA SAAC ACTUALIZADA
   const esLobato = ramaId === 'LOBATOS';
   const term = esLobato ? 'Cacería' : 'Proyecto';
   const subTerm = esLobato ? 'Seisena' : (ramaId === 'SCOUTS' ? 'Patrulla' : 'Equipo');
@@ -52,13 +56,21 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
     setForm(proy);
     setActiveStep(0);
     setModoEdicion(true);
+    // 🎯 Si el educador comentó algo y el joven no lo vio, marcamos como "visto" al abrirlo
     if (proy.vistoPorJoven === false && onMarkAsSeen) onMarkAsSeen(proy.id);
   };
 
-  const handleLocalSave = (status = 'BORRADOR') => {
-    onSave({ ...form, estado: status, ultimaModificacion: new Date() });
-    setModoEdicion(false);
-    if (status === 'PENDIENTE') alert(`¡${term} enviada a revisión!`);
+  const handleLocalSave = async (status = 'BORRADOR') => {
+    setIsSaving(true);
+    try {
+      await onSave({ ...form, estado: status, ultimaModificacion: new Date() });
+      setModoEdicion(false);
+      if (status === 'PENDIENTE') alert(`¡Tu ${term} ha sido enviada a los educadores para revisión!`);
+    } catch (error) {
+      alert("Error al guardar: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleConfirmarFinalizacion = (proyectoActualizado) => {
@@ -98,7 +110,7 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
             <Typography variant="h2" sx={{ fontWeight: 900, mb: 1, textTransform: 'uppercase' }}>{term}s de {subTerm}</Typography>
             <Typography variant="h6" sx={{ opacity: 0.8, fontWeight: 500 }}>{subTerm} {joven?.equipo}</Typography>
           </Box>
-          <Button variant="contained" size="large" startIcon={<AddCircle />} onClick={handleNuevo} sx={{ bgcolor: 'white', color: 'black', fontWeight: 900, borderRadius: 4, px: 4 }}>
+          <Button variant="contained" size="large" startIcon={<AddCircle />} onClick={handleNuevo} sx={{ bgcolor: 'white', color: 'black', fontWeight: 900, borderRadius: 4, px: 4, '&:hover': { bgcolor: '#f0f0f0' } }}>
             Nueva {term}
           </Button>
         </Paper>
@@ -109,16 +121,29 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
               <TableRow>
                 <TableCell sx={{ color: 'white', fontWeight: 800 }}>TÍTULO</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 800 }}>ESTADO</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 800 }}>MODIFICADO</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 800 }}>ÚLTIMA VEZ</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 800 }} align="center">ACCIONES</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {misProyectos.map((proy) => {
+              {misProyectos.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    Aún no han propuesto ninguna {term}. ¡Es momento de empezar!
+                  </TableCell>
+                </TableRow>
+              ) : misProyectos.map((proy) => {
                 const proyReadOnly = proy.estado !== 'BORRADOR' && proy.estado !== 'OBSERVADO';
                 return (
                   <TableRow key={proy.id} hover>
-                    <TableCell sx={{ fontWeight: 700 }}>{proy.titulo}</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        {proy.titulo}
+                        {proy.vistoPorJoven === false && (
+                          <Chip label="NUEVO COMENTARIO" size="small" color="secondary" sx={{ fontSize: '0.6rem', fontWeight: 900 }} />
+                        )}
+                      </Stack>
+                    </TableCell>
                     <TableCell>
                       <Chip label={proy.estado} color={getStatusColor(proy.estado)} sx={{ fontWeight: 900, borderRadius: 2 }} />
                     </TableCell>
@@ -148,7 +173,7 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Eliminar">
-                          <IconButton color="error" onClick={() => onDelete(proy.id)}>
+                          <IconButton color="error" onClick={() => onDelete(proy.id)} disabled={proy.estado === 'ACTIVO'}>
                             <DeleteOutline />
                           </IconButton>
                         </Tooltip>
@@ -175,10 +200,23 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
   // --- VISTA DE EDITOR (STEPPER) ---
   return (
     <Container maxWidth="xl" sx={{ py: 3, animation: 'fadeIn 0.4s ease-out' }}>
-      <Button onClick={() => setModoEdicion(false)} sx={{ mb: 3, fontWeight: 800, color: '#64748b' }}>← Volver</Button>
+      <Button onClick={() => setModoEdicion(false)} sx={{ mb: 3, fontWeight: 800, color: '#64748b' }}>← Volver al listado</Button>
       <Card elevation={6} sx={{ borderRadius: 6, overflow: 'hidden' }}>
         <Box sx={{ bgcolor: CONFIG_RAMA.color, p: 1 }} />
         <CardContent sx={{ p: { xs: 3, md: 6 } }}>
+          
+          {/* 🎯 FEEDBACK DEL EDUCADOR: Sección fundamental para el diálogo */}
+          {form.comentariosEducador && (
+            <Alert 
+              severity="info" 
+              icon={<Feedback />}
+              sx={{ mb: 4, borderRadius: 4, border: '1px solid #bde0fe', '& .MuiAlert-message': { width: '100%' } }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>Comentarios de los Educadores:</Typography>
+              <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic' }}>"{form.comentariosEducador}"</Typography>
+            </Alert>
+          )}
+
           <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 8 }}>
             {PASOS.map((paso) => (
               <Step key={paso.label}><StepLabel><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{paso.label}</Typography></StepLabel></Step>
@@ -188,22 +226,26 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
           <Box sx={{ minHeight: 350 }}>
             {activeStep === 0 && (
               <Stack spacing={4}>
-                <TextField fullWidth label="Nombre" variant="filled" value={form.titulo} onChange={(e) => setForm({...form, titulo: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3, fontWeight: 800 } }} />
-                <TextField fullWidth multiline rows={6} label="¿Qué soñamos?" variant="filled" value={form.objetivos} onChange={(e) => setForm({...form, objetivos: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3 } }} />
+                <TextField fullWidth label={`Nombre de la ${term}`} variant="filled" value={form.titulo} onChange={(e) => setForm({...form, titulo: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3, fontWeight: 800 } }} />
+                <TextField fullWidth multiline rows={6} label="¿Qué soñamos? (Objetivos)" variant="filled" value={form.objetivos} onChange={(e) => setForm({...form, objetivos: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3 } }} />
               </Stack>
             )}
-            {activeStep === 1 && <TextField fullWidth multiline rows={10} label="Recursos" variant="filled" value={form.diagnostico} onChange={(e) => setForm({...form, diagnostico: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3 } }} />}
-            {activeStep === 2 && <TextField fullWidth multiline rows={10} label="Tareas" variant="filled" value={form.tareas} onChange={(e) => setForm({...form, tareas: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3 } }} />}
+            {activeStep === 1 && <TextField fullWidth multiline rows={10} label="¿Con qué contamos? (Diagnóstico/Recursos)" variant="filled" value={form.diagnostico} onChange={(e) => setForm({...form, diagnostico: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3 } }} />}
+            {activeStep === 2 && <TextField fullWidth multiline rows={10} label="¿Qué vamos a hacer? (Planificación/Tareas)" variant="filled" value={form.tareas} onChange={(e) => setForm({...form, tareas: e.target.value})} InputProps={{ readOnly: esSoloLectura, disableUnderline: true, sx: { borderRadius: 3 } }} />}
             {activeStep === 3 && (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <FactCheck sx={{ fontSize: 100, color: CONFIG_RAMA.color, mb: 2, opacity: 0.8 }} />
                 <Typography variant="h3" sx={{ fontWeight: 900, mb: 2 }}>{form.estado}</Typography>
+                
+                {form.estado === 'BORRADOR' && <Typography color="text.secondary">Tu {term} está en borrador. Solo vos y tu {subTerm} pueden verla.</Typography>}
+                {form.estado === 'PENDIENTE' && <Alert severity="warning" sx={{ maxWidth: 500, mx: 'auto', borderRadius: 3 }}>Esperando la revisión de los educadores.</Alert>}
+                
                 {form.estado === 'FINALIZADO' && (
-                  <Paper variant="outlined" sx={{ mt: 3, p: 3, borderRadius: 4, bgcolor: '#f0f9ff', textAlign: 'left' }}>
+                  <Paper variant="outlined" sx={{ mt: 3, p: 3, borderRadius: 4, bgcolor: '#f0f9ff', textAlign: 'left', maxWidth: 600, mx: 'auto' }}>
                     <Typography variant="h6" color="primary" sx={{ fontWeight: 900 }}>Evaluación Final:</Typography>
                     <Typography variant="body1" sx={{ mt: 1 }}>"{form.evaluacionJoven}"</Typography>
                     <Divider sx={{ my: 2 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 800 }}>Logro: {form.nivelLogro}</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Nivel de Logro: {form.nivelLogro}</Typography>
                   </Paper>
                 )}
               </Box>
@@ -219,9 +261,16 @@ export const MisProyectosView = ({ joven, proyectos = [], onSave, onDelete, onMa
                 <Button variant="contained" disabled={activeStep === 3} onClick={() => setActiveStep(activeStep + 1)} sx={{ borderRadius: 3, px: 4, bgcolor: CONFIG_RAMA.color }}>Siguiente</Button>
               ) : (
                 <>
-                  <Button variant="text" startIcon={<Save />} onClick={() => handleLocalSave('BORRADOR')} sx={{ fontWeight: 800, color: '#64748b' }}>Guardar Borrador</Button>
-                  <Button variant="contained" color="warning" endIcon={<Send />} onClick={() => (activeStep === 3 ? handleLocalSave('PENDIENTE') : setActiveStep(activeStep + 1))} sx={{ borderRadius: 3, px: 6 }}>
-                    {activeStep === 3 ? 'Enviar a Revisión' : 'Siguiente'}
+                  <Button variant="text" startIcon={isSaving ? <CircularProgress size={20} /> : <Save />} onClick={() => handleLocalSave('BORRADOR')} disabled={isSaving} sx={{ fontWeight: 800, color: '#64748b' }}>Guardar Borrador</Button>
+                  <Button 
+                    variant="contained" 
+                    color="warning" 
+                    endIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <Send />} 
+                    onClick={() => (activeStep === 3 ? handleLocalSave('PENDIENTE') : setActiveStep(activeStep + 1))} 
+                    disabled={isSaving}
+                    sx={{ borderRadius: 3, px: 6 }}
+                  >
+                    {activeStep === 3 ? `Enviar ${term}` : 'Siguiente'}
                   </Button>
                 </>
               )}

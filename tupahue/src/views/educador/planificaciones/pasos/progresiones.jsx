@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { 
   Typography, Paper, Stack, Box, 
   Table, TableBody, TableCell, TableContainer, 
@@ -9,42 +9,34 @@ import { Assessment, NorthEast, Event, Group, Person, ContactPage } from '@mui/i
 
 import { RAMAS } from '../../../../constants/ramas';
 
-export const PasoProgresiones = ({ ramaId, data, setData }) => {
+// 🎯 Recibimos 'scouts' y 'handlers' desde el Editor
+export const PasoProgresiones = ({ ramaId, data, setData, scouts, handlers }) => {
   
   const idBusqueda = ramaId?.toUpperCase() || 'SCOUTS';
   const CONFIG_RAMA = RAMAS[idBusqueda];
   const etapasDefinidas = CONFIG_RAMA?.etapas || [];
 
-  // Estados para el Modal de Pase de Rama (Calendario)
   const [modalPaseOpen, setModalPaseOpen] = useState(false);
   const [scoutPase, setScoutPase] = useState(null);
   const [fechaPase, setFechaPase] = useState('');
 
-  // NUEVO: Estados para el Modal de Ver Ficha
   const [fichaOpen, setFichaOpen] = useState(false);
   const [scoutFicha, setScoutFicha] = useState(null);
 
-  const storageKeyScouts = 'tupahue_scouts';
-  const scoutsRaw = localStorage.getItem(storageKeyScouts);
-  let protagonistasRama = [];
+  // 🎯 FILTRADO REAL: Usamos la prop 'scouts' en lugar de localStorage
+  const protagonistasRama = useMemo(() => {
+    if (!scouts) return [];
+    return scouts.filter(s => s.rama?.toString().toUpperCase() === idBusqueda);
+  }, [scouts, idBusqueda]);
 
-  if (scoutsRaw) {
-    try {
-      const todosLosScouts = JSON.parse(scoutsRaw);
-      protagonistasRama = todosLosScouts.filter(s => 
-        s.rama?.toString().toUpperCase() === idBusqueda
+  const protagonistasPorEtapa = useMemo(() => {
+    return etapasDefinidas.reduce((acc, etapa) => {
+      acc[etapa.id] = protagonistasRama.filter(p => 
+        p.etapa === etapa.id || (!p.etapa && etapa.id === etapasDefinidas[0].id)
       );
-    } catch (e) {
-      console.error("Error al procesar la nómina", e);
-    }
-  }
-
-  const protagonistasPorEtapa = etapasDefinidas.reduce((acc, etapa) => {
-    acc[etapa.id] = protagonistasRama.filter(p => 
-      p.etapa === etapa.id || (!p.etapa && etapa.id === etapasDefinidas[0].id)
-    );
-    return acc;
-  }, {});
+      return acc;
+    }, {});
+  }, [protagonistasRama, etapasDefinidas]);
 
   useEffect(() => {
     if (protagonistasRama.length > 0) {
@@ -56,48 +48,48 @@ export const PasoProgresiones = ({ ramaId, data, setData }) => {
         };
       });
 
-      if (!data.progresiones || data.progresiones.length !== datosParaPDF.length) {
+      // Solo actualizamos si hay cambios reales para evitar bucles infinitos
+      if (!data.progresiones || JSON.stringify(data.progresiones) !== JSON.stringify(datosParaPDF)) {
         setData(prev => ({ ...prev, progresiones: datosParaPDF }));
       }
     }
-  }, [ramaId, protagonistasRama.length]);
+  }, [protagonistasRama, etapasDefinidas, data.progresiones, setData]);
 
-  // Funciones Pase de Rama
   const handleAbrirModalPase = (scout) => {
     setScoutPase(scout);
     setFechaPase(''); 
     setModalPaseOpen(true);
   };
 
-  const handleConfirmarPase = () => {
+  const handleConfirmarPase = async () => {
     if (!fechaPase) {
       alert("Por favor, seleccioná una fecha para el pase.");
       return;
     }
 
-    const eventosGuardados = localStorage.getItem('tupahue_eventos');
-    const arrayEventos = eventosGuardados ? JSON.parse(eventosGuardados) : [];
-
-    const nuevoEvento = {
-      id: Date.now(),
-      titulo: `Pase de Rama: ${scoutPase.nombre} ${scoutPase.apellido}`,
-      title: `Pase de Rama: ${scoutPase.nombre} ${scoutPase.apellido}`, 
-      fecha: fechaPase,
-      date: fechaPase,
-      tipo: 'GRUPAL', 
-      color: '#5A189A', 
-      descripcion: `Se agendó el pase de rama del protagonista ${scoutPase.nombre} ${scoutPase.apellido} hacia su nueva etapa.`
-    };
-
-    localStorage.setItem('tupahue_eventos', JSON.stringify([...arrayEventos, nuevoEvento]));
-
-    alert(`¡Éxito! El pase de ${scoutPase.nombre} fue agendado en el Calendario Grupal.`);
+    // 🎯 SINCRONIZACIÓN CON SUPABASE:
+    // Usamos el handler que ya sabe guardar en la base de datos
+    try {
+      if (handlers?.handleAddEvento) {
+        await handlers.handleAddEvento({
+          titulo: `Pase de Rama: ${scoutPase.nombre} ${scoutPase.apellido}`,
+          fecha: fechaPase,
+          tipo: 'GRUPAL', 
+          color: '#5A189A', 
+          descripcion: `Se agendó el pase de rama del protagonista ${scoutPase.nombre} ${scoutPase.apellido} hacia su nueva etapa.`
+        });
+        alert(`¡Éxito! El pase de ${scoutPase.nombre} fue agendado en el Calendario Grupal de Supabase.`);
+      } else {
+        throw new Error("No se encontró el controlador de eventos.");
+      }
+    } catch (error) {
+      alert("Error al agendar el pase: " + error.message);
+    }
     
     setModalPaseOpen(false);
     setScoutPase(null);
   };
 
-  // NUEVO: Funciones Ver Ficha
   const handleAbrirFicha = (scout) => {
     setScoutFicha(scout);
     setFichaOpen(true);
@@ -151,7 +143,6 @@ export const PasoProgresiones = ({ ramaId, data, setData }) => {
                                 {p.equipo || p.patrulla || 'Sin equipo'}
                               </TableCell>
                               <TableCell align="right">
-                                {/* NUEVO: BOTÓN VER FICHA ACTIVADO */}
                                 <Button 
                                   size="small" 
                                   onClick={() => handleAbrirFicha(p)}
@@ -268,7 +259,7 @@ export const PasoProgresiones = ({ ramaId, data, setData }) => {
         </DialogActions>
       </Dialog>
 
-      {/* NUEVO: MODAL DE FICHA RESUMEN DEL JOVEN */}
+      {/* MODAL DE FICHA RESUMEN DEL JOVEN */}
       <Dialog open={fichaOpen} onClose={() => setFichaOpen(false)} maxWidth="sm" fullWidth>
         {scoutFicha && (
           <>
@@ -319,11 +310,11 @@ export const PasoProgresiones = ({ ramaId, data, setData }) => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled' }}>FECHA DE NACIMIENTO</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{scoutFicha.fechaNacimiento || scoutFicha.nacimiento || 'No registrada'}</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{scoutFicha.fechaNacimiento || 'No registrada'}</Typography>
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.disabled' }}>TELÉFONO / CONTACTO</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{scoutFicha.telefono || scoutFicha.contacto || 'No registrado'}</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{scoutFicha.celular || 'No registrado'}</Typography>
                   </Grid>
                 </Grid>
               </Stack>

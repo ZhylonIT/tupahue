@@ -17,6 +17,7 @@ export const DashboardPage = () => {
   }, [userFuncion]);
 
   // 3. Hook con lógica reactiva
+  // 🚩 NOTA: Por ahora pasamos [] porque todavía no buscamos los datos en Supabase
   const state = useDashboard(user, [], [], userFuncion);
 
   // Protección de renderizado
@@ -26,12 +27,11 @@ export const DashboardPage = () => {
     <Box sx={{ display: 'flex', bgcolor: '#f8f9fa', minHeight: '100vh' }}>
       <CssBaseline />
       
-      {/* SIDEBAR: Usamos state.setVistaActual correctamente */}
       <Sidebar 
         ramaSeleccionada={state.ramaActiva} 
         onRamaChange={state.setRamaActiva} 
         vistaActual={state.vistaActual}
-        setVistaActual={state.setVistaActual}        
+        setVistaActual={state.setVistaActual}         
         canChangeRama={puedeCambiarRama} 
         userFuncion={userFuncion}
         onLogout={logout}
@@ -50,10 +50,12 @@ export const DashboardPage = () => {
       >
         <Toolbar sx={{ display: { xs: 'block', sm: 'none' } }} />
         
-        {user.rol === ROLES.EDUCADOR && (
+        {/* 🛠️ CORRECCIÓN AQUÍ: 
+            Cambiamos user.rol por user.role y permitimos ADMIN */}
+        {(user.role === ROLES.EDUCADOR || user.role === 'ADMIN') && (
           <EducadorMainView 
             vistaActual={state.vistaActual}
-            setVistaActual={state.setVistaActual} // 👈 CORREGIDO: Ahora usa state.setVistaActual
+            setVistaActual={state.setVistaActual} 
             setRamaActiva={state.setRamaActiva}
             ramaActiva={state.ramaActiva}
             scouts={state.scouts}
