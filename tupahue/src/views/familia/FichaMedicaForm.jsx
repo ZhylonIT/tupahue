@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
-import { 
-  Box, Typography, TextField, Grid, Button, Checkbox, 
-  FormControlLabel, Paper, Stack, Dialog, DialogTitle, 
-  DialogContent, DialogActions, Divider, CircularProgress, Alert 
+import {
+  Box, Typography, TextField, Grid, Button, Checkbox,
+  FormControlLabel, Paper, Stack, Dialog, DialogTitle,
+  DialogContent, DialogActions, Divider, CircularProgress, Alert
 } from '@mui/material';
 import { Save, CheckCircle, Visibility } from '@mui/icons-material';
 import { FichaMedicaTemplate } from './FichaMedicaTemplate';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { generarFichaMedicaPDF } from '../../services/pdfService'; 
+import { generarFichaMedicaPDF } from '../../services/pdfService';
 
 export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -40,25 +40,25 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
     } else {
       setFormData(defaultMedicos);
     }
-    if (open) setSuccess(false); 
+    if (open) setSuccess(false);
   }, [scout, open]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
     }));
     if (success) setSuccess(false);
   };
 
   const handleGuardar = async (e) => {
-    if (e) e.preventDefault(); 
+    if (e) e.preventDefault();
     setLoading(true);
     try {
       const datosConFirma = {
         ...formData,
-        firmaPadre: user?.firma_url, 
+        firmaPadre: user?.firma_url,
         aclaracionPadre: `${user?.nombre} ${user?.apellido}`,
         dniPadre: user?.dni,
         fechaFirmaPadre: new Date().toLocaleDateString('es-AR')
@@ -69,11 +69,11 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
       
       const filePath = `${scout.id}/ficha_medica/ficha_medica.pdf`;
       await supabase.storage.from('documentos').upload(filePath, pdfBlob, {
-        contentType: 'application/pdf', upsert: true 
+        contentType: 'application/pdf', upsert: true
       });
 
       await onSave(pibeActualizado);
-      setSuccess(true); 
+      setSuccess(true);
     } catch (error) {
       console.error(error);
       alert("Error al guardar la ficha.");
@@ -100,7 +100,6 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
         )}
 
         <Grid container spacing={3}>
-           {/* SECCIÓN 1: CONTACTO */}
            <Grid item xs={12} md={4}>
             <Paper elevation={0} sx={{ p: 3, height: '100%', borderRadius: 4, border: '1px solid #e0e0e0' }}>
               <Typography variant="subtitle1" fontWeight="900" color="primary" mb={2}>1. Emergencia</Typography>
@@ -113,7 +112,6 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
             </Paper>
           </Grid>
 
-          {/* SECCIÓN 2: ANTECEDENTES */}
           <Grid item xs={12} md={4}>
             <Paper elevation={0} sx={{ p: 3, height: '100%', borderRadius: 4, border: '1px solid #e0e0e0' }}>
               <Typography variant="subtitle1" fontWeight="900" color="primary" mb={2}>2. Antecedentes</Typography>
@@ -126,9 +124,9 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
                   { n: 'internaciones', l: 'Internaciones' }
                 ].map((item) => (
                   <Grid item xs={6} key={item.n}>
-                    <FormControlLabel 
-                      control={<Checkbox size="small" checked={formData[item.n] || false} onChange={handleChange} name={item.n} />} 
-                      label={<Typography variant="caption" sx={{ fontWeight: 700 }}>{item.l}</Typography>} 
+                    <FormControlLabel
+                      control={<Checkbox size="small" checked={formData[item.n] || false} onChange={handleChange} name={item.n} />}
+                      label={<Typography variant="caption" sx={{ fontWeight: 700 }}>{item.l}</Typography>}
                     />
                   </Grid>
                 ))}
@@ -141,7 +139,6 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
             </Paper>
           </Grid>
 
-          {/* SECCIÓN 3: CLÍNICA Y VACUNAS */}
           <Grid item xs={12} md={4}>
             <Paper elevation={0} sx={{ p: 3, height: '100%', borderRadius: 4, border: '1px solid #e0e0e0' }}>
               <Typography variant="subtitle1" fontWeight="900" color="primary" mb={1}>3. Clínica y Vacunas</Typography>
@@ -162,7 +159,6 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
             </Paper>
           </Grid>
 
-          {/* SECCIÓN 4: DETALLE MÉDICO */}
           <Grid item xs={12} md={8}>
             <Paper elevation={0} sx={{ p: 3, borderRadius: 4, border: '1px solid #e0e0e0' }}>
               <Typography variant="subtitle1" fontWeight="900" color="primary" mb={2}>4. Alergias, Medicación y Salud Mental</Typography>
@@ -207,11 +203,11 @@ export const FichaMedicaForm = ({ open, onClose, scout, onSave }) => {
 
       <DialogActions sx={{ p: 3, bgcolor: '#f8f9fa' }} className="no-print">
         <Button onClick={onClose} sx={{ fontWeight: 900 }}>Cerrar</Button>
-        <Button 
-          variant="contained" 
-          onClick={handleGuardar} 
+        <Button
+          variant="contained"
+          onClick={handleGuardar}
           disabled={loading || success}
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (success ? <CheckCircle /> : <Save />)} 
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (success ? <CheckCircle /> : <Save />)}
           sx={{ bgcolor: success ? '#4caf50' : '#5A189A', fontWeight: 900, px: 4, borderRadius: 2 }}
         >
           {loading ? 'Guardando...' : (success ? '¡Guardado!' : 'Guardar Cambios')}

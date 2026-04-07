@@ -61,7 +61,8 @@ export const DashboardPage = () => {
           handlers={state.handlers}
           userFuncion={userFuncion} 
           adultos={state.adultos}
-          user={user} // 🎯 AHORA PASA EL USER PARA VINCULACIÓN
+          user={user} 
+          handleSaveScout={state.handleSaveScout} // 🎯 AHORA PASA LA FUNCIÓN DE GUARDADO AL MAIN VIEW
         />
         
         <DashboardModals state={state} handleSaveScout={state.handleSaveScout} />

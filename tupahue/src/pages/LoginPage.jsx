@@ -39,7 +39,8 @@ export const LoginPage = () => {
   const isEmailInvalid = email !== '' && !email.includes('@');
   const isRecoverEmailInvalid = emailRecover !== '' && !emailRecover.includes('@');
 
-  const cleanDni = (value) => value.replace(/\D/g, '');
+  // Limpia puntos, guiones y espacios
+  const cleanDni = (value) => value.replace(/\D/g, '').trim();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,30 +51,35 @@ export const LoginPage = () => {
 
     try {
       if (isRegister) {
-        if (!nombre || !apellido || !dni) {
+        const cleanedDni = cleanDni(dni);
+        if (!nombre || !apellido || !cleanedDni) {
           throw new Error("Nombre, Apellido y DNI son obligatorios.");
         }
-        const dnisArray = hijosDnis.split(',').map(d => cleanDni(d)).filter(d => d !== '');
+
+        const dnisArray = hijosDnis.split(',')
+          .map(d => cleanDni(d))
+          .filter(d => d !== '');
         
         await register({ 
-          email, 
+          email: email.trim().toLowerCase(), 
           password, 
-          dni: cleanDni(dni), 
-          nombre, 
-          apellido,
+          dni: cleanedDni, 
+          nombre: nombre.trim(), 
+          apellido: apellido.trim(),
           roleSolicitado: role, 
           hijosDnis: dnisArray 
         });
       } else {
-        await login(email, password);
+        await login(email.trim().toLowerCase(), password);
       }
       
       navigate('/dashboard'); 
     } catch (error) {
       console.error("Error Auth:", error.message);
-      setErrorMsg(error.message.includes('Invalid login credentials') 
-        ? 'Email o contraseña incorrectos.' 
-        : error.message || 'Hubo un problema al conectar con el servidor.');
+      let msg = error.message;
+      if (msg.includes('Invalid login credentials')) msg = 'Email o contraseña incorrectos.';
+      if (msg.includes('User already registered')) msg = 'Este email ya está registrado.';
+      setErrorMsg(msg || 'Hubo un problema al conectar con el servidor.');
     } finally {
       setLoading(false);
     }
@@ -160,7 +166,7 @@ export const LoginPage = () => {
                   <TextField 
                     fullWidth label="Mi DNI" size="small"
                     value={dni} 
-                    onChange={(e) => setDni(cleanDni(e.target.value))}
+                    onChange={(e) => setDni(e.target.value)}
                     placeholder="Solo números"
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                     InputProps={{
@@ -188,7 +194,7 @@ export const LoginPage = () => {
                           size="small" fullWidth sx={{ mt: 1, bgcolor: 'white' }}
                           value={hijosDnis} 
                           onChange={(e) => setHijosDnis(e.target.value)}
-                          helperText="Usar solo números (separados por coma)"
+                          helperText="DNI sin puntos (separados por coma)"
                         />
                       )}
                     </Box>
@@ -258,6 +264,7 @@ export const LoginPage = () => {
         </Paper>
       </Container>
 
+      {/* DIÁLOGO DE RECUPERACIÓN (Se mantiene igual) */}
       <Dialog open={openRecover} onClose={() => setOpenRecover(false)}>
         <DialogTitle sx={{ fontWeight: 900 }}>Recuperar Contraseña</DialogTitle>
         <DialogContent>

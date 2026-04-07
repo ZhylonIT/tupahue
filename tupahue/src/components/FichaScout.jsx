@@ -1,36 +1,75 @@
+import { useState, useEffect } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, Box, Typography, Grid, 
-  Avatar, Divider, Stack, IconButton, Button, Paper, Alert 
+  Avatar, Divider, Stack, IconButton, Button, Paper, Alert, 
+  CircularProgress, List, ListItem, ListItemIcon, ListItemText
 } from '@mui/material';
 import { 
-  Close, LocalHospital, Phone, Home, Assignment, 
-  HistoryEdu, CheckCircle, VerifiedUser, LocationOn
+  Close, LocalHospital, Assignment, 
+  HistoryEdu, VerifiedUser, LocationOn, 
+  InsertDriveFile, ErrorOutline, CheckCircle
 } from '@mui/icons-material';
+import { supabase } from '../lib/supabaseClient';
+
+const NOMBRES_DOCUMENTOS = {
+  ingreso_menores: 'Autorización de Ingreso',
+  fotocopias_dni: 'DNI (Padres e Hijo)',
+  partida_nacimiento: 'Partida de Nacimiento',
+  ficha_medica: 'Ficha Médica',
+  ficha_personales: 'Datos Personales',
+  salidas_cercanas: 'Salidas Cercanas',
+  uso_imagen: 'Uso de Imagen',
+  auto_campamento_menor: 'Última Salida/Campamento'
+};
 
 export const FichaScout = ({ open, onClose, scout, onAvalarIngreso }) => {
+  const [archivosReales, setArchivosReales] = useState([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+
+  // 🎯 Lógica de "Vida": Verificamos qué hay realmente en el Storage al abrir
+  useEffect(() => {
+    if (open && scout) {
+      checkStorageFiles();
+    }
+  }, [open, scout]);
+
+  const checkStorageFiles = async () => {
+    setLoadingFiles(true);
+    try {
+      // Listamos la carpeta raíz del scout para ver qué subcarpetas tienen archivos
+      const { data: carpetas } = await supabase.storage.from('documentos').list(scout.id);
+      // Guardamos solo los IDs de los documentos que tienen al menos un archivo dentro
+      const idsExistentes = carpetas?.map(c => c.name) || [];
+      setArchivosReales(idsExistentes);
+    } catch (e) {
+      console.error("Error validando archivos:", e);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
   if (!scout) return null;
 
   const dm = scout.datosMedicos || {};
   const dp = scout.datosPersonales || {};
   const ds = scout.datosSalidas || {}; 
-  const tieneIngresoPendiente = scout.documentos?.includes('ingreso_menores') && !scout.avaladoPorEducadores;
+  
+  // 🎯 El aval se requiere si tiene la ficha de ingreso pero el educador no firmó aún
+  const tieneIngresoEnStorage = archivosReales.includes('ingreso_menores');
+  const requiereAval = tieneIngresoEnStorage && !scout.avaladoPorEducadores;
 
   return (
     <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
-      fullWidth 
-      scroll="paper" 
-      PaperProps={{ sx: { borderRadius: 4, backgroundImage: 'none' } }}
+      open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper" 
+      PaperProps={{ sx: { borderRadius: 4 } }}
     >
       <DialogTitle sx={{ m: 0, p: 2, bgcolor: '#f8f9fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee' }}>
         <Stack direction="row" spacing={2} alignItems="center">
-          <Avatar sx={{ bgcolor: '#5A189A', width: 55, height: 55, fontWeight: 900, fontSize: '1.5rem' }}>
+          <Avatar sx={{ bgcolor: '#5A189A', width: 55, height: 55, fontWeight: 900 }}>
             {scout.apellido?.charAt(0)}
           </Avatar>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2, color: '#1a1a1a' }}>
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
               {scout.apellido?.toUpperCase()}, {scout.nombre}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
@@ -38,144 +77,119 @@ export const FichaScout = ({ open, onClose, scout, onAvalarIngreso }) => {
             </Typography>
           </Box>
         </Stack>
-        <IconButton onClick={onClose} sx={{ color: '#666' }}><Close /></IconButton>
+        <IconButton onClick={onClose}><Close /></IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3, bgcolor: '#ffffff' }}>
-        {/* BANNER: AVAL PENDIENTE */}
-        {tieneIngresoPendiente && (
-          <Alert 
-            severity="warning" 
-            variant="filled"
-            icon={<HistoryEdu />}
-            action={
-              <Button color="inherit" size="small" variant="outlined" onClick={() => onAvalarIngreso(scout.id)} sx={{ fontWeight: 900, borderRadius: 2 }}>
-                AVALAR INGRESO
-              </Button>
-            }
-            sx={{ mb: 3, borderRadius: 3, fontWeight: 700, boxShadow: '0 4px 12px rgba(237, 108, 2, 0.2)' }}
+      <DialogContent sx={{ p: 3 }}>
+        
+        {/* 🎯 PUNTO 3: MEJORA ESTÉTICA AVISO DE AVAL */}
+        {requiereAval && (
+          <Paper 
+            elevation={0}
+            sx={{ 
+              mb: 3, p: 2, borderRadius: 3, 
+              bgcolor: '#fff4e5', border: '2px dashed #ffa726',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}
           >
-            Autorización de ingreso cargada por la familia. Pendiente de aval del educador.
-          </Alert>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box sx={{ bgcolor: '#ffa726', p: 1, borderRadius: '50%', display: 'flex' }}>
+                <HistoryEdu sx={{ color: 'white' }} />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#663c00' }}>
+                  AVAL PENDIENTE
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#663c00' }}>
+                  La familia ya cargó la autorización de ingreso. Revisá los datos y avalá el legajo.
+                </Typography>
+              </Box>
+            </Stack>
+            <Button 
+              variant="contained" size="small"
+              onClick={() => onAvalarIngreso(scout)}
+              sx={{ bgcolor: '#ef6c00', fontWeight: 900, '&:hover': { bgcolor: '#e65100' } }}
+            >
+              AVALAR AHORA
+            </Button>
+          </Paper>
         )}
 
         <Grid container spacing={3}>
-          {/* BLOQUE 1: SALUD */}
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, height: '100%', bgcolor: '#fffcfc', borderColor: '#ffebee' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, display: 'flex', alignItems: 'center', gap: 1, color: '#c62828' }}>
-                <LocalHospital fontSize="small" /> Información de Salud
+          {/* ESTADO DOCUMENTAL REAL */}
+          <Grid item xs={12} md={4}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: '#fcfcfc' }}>
+              <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', display: 'block', mb: 1.5, textTransform: 'uppercase' }}>
+                Checklist Digital
               </Typography>
-              <Divider sx={{ mb: 2 }} />
-              
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>Alergias:</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: dm.alergia ? "#d32f2f" : "#2e7d32" }}>
-                    {dm.alergia ? `SÍ: ${dm.cualAlergia}` : 'No declara'}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>Emergencia:</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{dm.telEmergencia1} ({dm.personaEmergencia1})</Typography>
-                </Box>
-                
-                {dm.firmaPadre && (
-                  <Box sx={{ mt: 1, p: 1.5, bgcolor: '#ffffff', border: '1px dashed #ffcdd2', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ fontSize: '10px', fontWeight: 900, color: '#c62828', display: 'block', mb: 0.5 }}>FIRMA DDJJ SALUD:</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <img src={dm.firmaPadre} alt="Firma" style={{ maxHeight: 35, maxWidth: 90, filter: 'contrast(1.2)' }} />
-                      <Typography variant="caption" sx={{ fontSize: '9px', lineHeight: 1.1, color: '#666' }}>
-                        {dm.aclaracionPadre}<br/>{dm.fechaFirmaPadre}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )}
-              </Stack>
-            </Paper>
-          </Grid>
-
-          {/* BLOQUE 2: RESPONSABLES */}
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, height: '100%', bgcolor: '#f0f7ff', borderColor: '#e3f2fd' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, display: 'flex', alignItems: 'center', gap: 1, color: '#1565c0' }}>
-                <Assignment fontSize="small" /> Adultos Responsables
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>{dp.tutor1Nombre || 'Cargando...'}</Typography>
-                  <Typography variant="caption" color="text.secondary" display="block">{dp.tutor1Vinculo} • DNI: {dp.tutor1Dni}</Typography>
-                  <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 800 }}>Tel: {dp.tutor1Tel}</Typography>
-                </Box>
-
-                {dp.firmaPadre && (
-                  <Box sx={{ p: 1.5, bgcolor: '#ffffff', border: '1px dashed #bbdefb', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ fontSize: '10px', fontWeight: 900, color: '#1565c0', display: 'block', mb: 0.5 }}>FIRMA DATOS PERSONALES:</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <img src={dp.firmaPadre} alt="Firma" style={{ maxHeight: 35, maxWidth: 90 }} />
-                      <Typography variant="caption" sx={{ fontSize: '9px', lineHeight: 1.1, color: '#666' }}>
-                        {dp.aclaracionPadre}<br/>DNI: {dp.dniPadre}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )}
-              </Stack>
-            </Paper>
-          </Grid>
-
-          {/* BLOQUE 3: SALIDAS CERCANAS */}
-          <Grid item xs={12}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, bgcolor: '#f2fdfd', borderColor: '#b2ebf2' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, display: 'flex', alignItems: 'center', gap: 1, color: '#00838f' }}>
-                <LocationOn fontSize="small" /> Autorización de Salidas Cercanas
-              </Typography>
-              <Divider sx={{ mb: 1.5 }} />
-              {scout.datosSalidas ? (
-                <Stack direction="row" spacing={4} alignItems="center">
-                  <Box sx={{ p: 1, bgcolor: 'white', border: '1px solid #b2ebf2', borderRadius: 2, display: 'flex', justifyContent: 'center' }}>
-                    {ds.firmaPadre ? (
-                      <img src={ds.firmaPadre} alt="Firma Salidas" style={{ maxHeight: 45, maxWidth: 100 }} />
-                    ) : <Typography variant="caption" color="text.disabled">Sin firma</Typography>}
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 800, color: '#006064' }}>Rango Autorizado: {ds.rangoDistancia || '5 km'}</Typography>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                      <b>Vigencia:</b> Año {ds.anio} • <b>Firmado por:</b> {ds.aclaracionPadre}
-                    </Typography>
-                    <Typography variant="caption" color="text.disabled">Fecha: {ds.dia}/{ds.mes}/{ds.anio}</Typography>
-                  </Box>
-                </Stack>
+              {loadingFiles ? (
+                <Box sx={{ textAlign: 'center', py: 2 }}><CircularProgress size={20} /></Box>
               ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  Pendiente de completar por la familia.
-                </Typography>
+                <List dense sx={{ p: 0 }}>
+                  {Object.entries(NOMBRES_DOCUMENTOS).map(([id, nombre]) => {
+                    const existe = archivosReales.includes(id);
+                    return (
+                      <ListItem key={id} sx={{ px: 0 }}>
+                        <ListItemIcon sx={{ minWidth: 30 }}>
+                          {existe ? <CheckCircle sx={{ fontSize: 18, color: '#4caf50' }} /> : <ErrorOutline sx={{ fontSize: 18, color: '#bdbdbd' }} />}
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary={nombre} 
+                          primaryTypographyProps={{ variant: 'caption', fontWeight: existe ? 700 : 500, color: existe ? 'text.primary' : 'text.disabled' }} 
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
               )}
             </Paper>
           </Grid>
 
-          {/* BLOQUE 4: AVAL INSTITUCIONAL */}
+          {/* DATOS MÉDICOS */}
+          <Grid item xs={12} md={8}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderLeft: '4px solid #c62828' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: '#c62828' }}>ALERGIAS</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {dm.alergia ? dm.cualAlergia : 'Sin alergias declaradas'}
+                    </Typography>
+                 </Paper>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderLeft: '4px solid #1565c0' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: '#1565c0' }}>EMERGENCIA</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{dm.telEmergencia1}</Typography>
+                 </Paper>
+              </Grid>
+              
+              {/* FIRMA DE SALUD */}
+              <Grid item xs={12}>
+                {dm.firmaPadre && (
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <img src={dm.firmaPadre} alt="Firma" style={{ maxHeight: 40, maxWidth: 100 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 900, display: 'block' }}>DDJJ SALUD FIRMADA POR:</Typography>
+                      <Typography variant="caption">{dm.aclaracionPadre} ({dm.fechaFirmaPadre})</Typography>
+                    </Box>
+                  </Paper>
+                )}
+              </Grid>
+            </Grid>
+          </Grid>
+
+          {/* AVAL FINALIZADO */}
           {scout.avaladoPorEducadores && (
             <Grid item xs={12}>
-              <Paper sx={{ p: 2.5, bgcolor: '#f1f8e9', border: '2px solid #81c784', borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <Paper sx={{ p: 2.5, bgcolor: '#f1f8e9', border: '2px solid #81c784', borderRadius: 3 }}>
                 <Stack direction="row" spacing={3} alignItems="center">
                   <VerifiedUser sx={{ color: '#2e7d32', fontSize: 35 }} />
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle2" sx={{ color: '#2e7d32', fontWeight: 900, letterSpacing: 0.5 }}>LEGADO AVALADO POR EL GRUPO SCOUT</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Certificado oficialmente por: <Box component="span" sx={{ color: '#1b5e20' }}>{scout.educadorAvalista}</Box>
-                    </Typography>
-                    <Typography variant="caption" display="block" sx={{ fontSize: '10px' }}>
-                      Fecha de Aval: {scout.fechaAval} • Registro Interno: SAAC-996-{scout.dni}
-                    </Typography>
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ color: '#2e7d32', fontWeight: 900 }}>LEGAJO AVALADO POR EL GRUPO</Typography>
+                    <Typography variant="caption" display="block">Avalista: <b>{scout.educadorAvalista}</b> • {scout.fechaAval}</Typography>
                   </Box>
-                  <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                    {scout.firmaDigitalImg ? (
-                      <img src={scout.firmaDigitalImg} alt="Firma Educador" style={{ maxHeight: 50, filter: 'grayscale(1) contrast(1.5)' }} />
-                    ) : (
-                      <Typography variant="caption" color="text.disabled">Sello Digital</Typography>
-                    )}
+                  <Box sx={{ ml: 'auto' }}>
+                    <img src={scout.firmaDigitalImg} style={{ maxHeight: 45, filter: 'grayscale(1)' }} />
                   </Box>
                 </Stack>
               </Paper>

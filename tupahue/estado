@@ -208,3 +208,72 @@ Rol del Educador (DocumentosView.jsx / ArchivosModal): * Es un visor. Va ciegame
 Tiene un "truco" anti-caché (?t=timestamp) para ver siempre la versión más reciente al instante. No dibuja nada, no gasta memoria.
 
 Descargas Masivas (zipLegajos.jsx): * Solo recopila y empaqueta los archivos físicos que ya existen en el Storage de Supabase. Rápido y sin estresar la PC del educador.
+
+📑 Log de Desarrollo: Módulo de Legajos Digitales
+1. Estandarización Visual (Motor jsPDF)
+Creación de common.jsx: Definimos funciones core (drawHeader, drawSignatures, drawJustifiedParagraph) para que todos los PDFs sigan la estética oficial de Scouts de Argentina (SAAC).
+
+Migración Vectorial: Reemplazamos el viejo sistema de window.print() (HTML/Iframe) por generación nativa en jsPDF. Esto garantiza que los archivos no se vean borrosos y pesen pocos KB.
+
+2. Implementación de Fichas Oficiales
+Autorización de Ingreso (<18): Implementamos el diseño con sección de Testigos/Aval de Educadores tal cual la planilla 07-21.
+
+Autorización de Eventos (Menores): Creamos el formulario para salidas y campamentos, ajustando el recuadro de Aval Scout para que el texto no se desborde y respete los márgenes.
+
+DDJJ Participación (Rovers >18): Diseñamos la lógica para mayores de edad, incluyendo campos de transporte propio y autogestión de firma.
+
+3. Persistencia y Almacenamiento (Supabase)
+Estructura en Storage: Organizamos las carpetas como /{scoutId}/{tipo_doc}/{archivo.pdf}.
+
+Base de Datos: Creamos la columna datosEvento (JSONB) en la tabla scouts para que la información de los campamentos no se borre al refrescar (F5).
+
+Sincronización: El array documentos en la DB ahora se actualiza automáticamente cada vez que un padre o joven genera un PDF o sube un archivo.
+
+4. Optimización del Gestor de Archivos
+Colecciones de Archivos: Modificamos el DocumentosView y el ArchivosModal del educador para que pueda listar todos los archivos de una carpeta (fundamental para los 6 DNI del legajo).
+
+Descarga Masiva (ZIP): Ajustamos zipLegajos.jsx para que el ZIP no pise archivos con el mismo nombre y descargue el legajo completo de cada scout con nombres descriptivos.
+
+5. Interfaz del Educador y "Vida" al Legajo
+FichaScout Dinámica: El modal del educador ahora "escanea" el Storage en tiempo real. Si falta un papel, muestra el icono de alerta; si está, muestra el check verde.
+
+Aviso de Aval Estético: Rediseñamos el banner de "Aval Pendiente" para que sea llamativo y funcional, permitiendo al educador avalar con un clic.
+
+Próximos Pasos (Etapa 4):
+Para terminar de cerrar el círculo, nos queda:
+
+Lógica de Aval: Conectar el botón "AVALAR AHORA" con la firma digital del educador.
+
+Migración Rover: Asegurar que cuando un chico cumple 18, el sistema le habilite su nuevo panel de "Mi Documentación" de forma fluida.
+Log de Intervenciones: Módulo de Registro y Seguridad RLS
+
+Problema Detectado:
+
+Bloqueo de Registro (Jóvenes): Al intentar registrar un usuario Protagonista (Rover) con un DNI existente en la base de datos, el sistema arrojaba el error "DNI no está en nómina".
+
+Falso Negativo: Visualmente el DNI coincidía en la tabla scouts y en el formulario, pero la consulta a Supabase devolvía un array vacío (Array(0)).
+
+Diagnóstico y Depuración:
+
+Sanitización de Datos: Se revisó la ruta de datos entre LoginPage.jsx y AuthContext.jsx, confirmando que el DNI llegaba limpio.
+
+Búsqueda Flexible: Se implementó .ilike() en la consulta de validación para descartar problemas de espacios ocultos o "collation" en la tabla.
+
+Bypass de Diagnóstico: Se forzó una lectura genérica de la tabla scouts desde el contexto de registro (usuario anónimo), lo que expuso la raíz del problema: Supabase estaba bloqueando la lectura por políticas de seguridad.
+
+Causa Raíz:
+
+Row Level Security (RLS): La tabla scouts tenía el RLS activado sin una política que permitiera la lectura a usuarios no autenticados (anon). Por lo tanto, el sistema de registro no podía verificar si el DNI existía antes de crear la cuenta.
+
+Solución Implementada:
+
+Apertura controlada de RLS: Se inyectó una política SQL directa en Supabase para permitir la lectura pública exclusivamente para la validación de DNIs durante el registro:
+CREATE POLICY "Permitir lectura publica para validar DNI" ON "public"."scouts" FOR SELECT USING (true);
+
+Mejoras Adicionales en el Código (AuthContext.jsx & LoginPage.jsx):
+
+Limpieza Implacable: Se implementó una función sanitizeDni que extrae estrictamente los números antes de cualquier petición, evitando fallos por tipeo.
+
+Upsert Seguro: Se reemplazó la lógica destructiva (.delete()) al encontrar perfiles existentes por un .upsert(), protegiendo la integridad referencial (Foreign Keys) de la base de datos.
+
+Auto-Reparación de Vínculos: Se mejoró la lógica de inicio de sesión para que, si un usuario entra y su user_id quedó huérfano en la tabla scouts, el sistema lo busque por DNI y lo vuelva a enlazar de forma transparente en segundo plano.

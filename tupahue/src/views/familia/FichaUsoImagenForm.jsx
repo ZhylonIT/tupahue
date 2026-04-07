@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { 
-  Box, Typography, TextField, Grid, Button, Paper, 
-  Stack, Dialog, DialogTitle, DialogContent, DialogActions 
+  Box, Typography, TextField, Stack, Button, Paper, 
+  Dialog, DialogTitle, DialogContent, DialogActions, 
+  CircularProgress, Alert 
 } from '@mui/material';
-import { Print, Save } from '@mui/icons-material';
-import { FichaUsoImagenTemplate } from './FichaUsoImagenTemplate';
+import { Visibility, Save, CheckCircle } from '@mui/icons-material';
+import { generarUsoImagenPDF } from '../../services/pdfService';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
 export const FichaUsoImagenForm = ({ open, onClose, scout, onSave }) => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   
   const [formData, setFormData] = useState({
     anio: String(new Date().getFullYear()),
@@ -15,53 +21,84 @@ export const FichaUsoImagenForm = ({ open, onClose, scout, onSave }) => {
     tutorDomicilio: '',
   });
 
-  // 🎯 Lógica de Inteligencia Colectiva: Precargamos datos si están vacíos
   useEffect(() => {
     if (open && scout) {
       const di = scout.datosImagen || {};
       const dp = scout.datosPersonales || {};
       const dm = scout.datosMedicos || {};
-      const ds = scout.datosSalidas || {}; // Por si existe ficha de salidas
+      const ds = scout.datosSalidas || {};
 
       setFormData({
         anio: di.anio || String(new Date().getFullYear()),
-        // Buscamos el nombre del tutor en orden de prioridad
         tutorNombre: di.tutorNombre || dp.tutor1Nombre || ds.tutorNombre || '',
-        // Buscamos el DNI del tutor
         tutorDni: di.tutorDni || dp.tutor1Dni || ds.tutorDni || '',
-        // Buscamos el domicilio en la ficha médica o personal
         tutorDomicilio: di.tutorDomicilio || dm.domicilio || '',
       });
+      setSuccess(false); // Reiniciamos el estado de éxito al abrir
     }
   }, [open, scout]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (success) setSuccess(false);
   };
 
-  const handleGuardar = () => {
-    // 🎯 Mandamos la actualización al DocumentacionView
-    onSave({ 
-      ...scout, 
-      datosImagen: formData 
-    });
-    onClose();
+  const handleGuardar = async (e) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+
+    try {
+      // 1. Inyectamos la firma digital del padre
+      const datosConFirma = {
+        ...formData,
+        firmaPadre: user?.firma_url 
+      };
+
+      const pibeActualizado = { ...scout, datosImagen: datosConFirma };
+
+      // 2. Generamos el PDF Vectorial en formato Blob (true = returnBlob)
+      const pdfBlob = await generarUsoImagenPDF(pibeActualizado, true);
+      
+      // 3. Subimos el archivo al Storage de Supabase
+      const filePath = `${scout.id}/uso_imagen/uso_imagen.pdf`;
+      await supabase.storage.from('documentos').upload(filePath, pdfBlob, {
+        contentType: 'application/pdf', 
+        upsert: true 
+      });
+
+      // 4. Actualizamos la base de datos y notificamos a la vista principal
+      await onSave(pibeActualizado);
+      setSuccess(true); 
+    } catch (error) {
+      console.error("Error al guardar Autorización de Imagen:", error);
+      alert("Error al guardar la autorización.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePrint = () => {
-    window.print();
+    // Genera el PDF para visualizar/descargar inyectando la firma en tiempo real
+    const scoutTemp = { ...scout, datosImagen: { ...formData, firmaPadre: user?.firma_url } };
+    generarUsoImagenPDF(scoutTemp, false); 
   };
 
   if (!scout) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth disableEnforceFocus PaperProps={{ sx: { borderRadius: 3 } }}>
       <DialogTitle sx={{ bgcolor: '#e65100', color: 'white', fontWeight: '900', py: 2 }}>
         Autorización Uso de Imagen: {scout.nombre}
       </DialogTitle>
       
-      <DialogContent sx={{ p: 4, bgcolor: '#f8f9fa' }} className="no-print">
+      <DialogContent sx={{ p: 4, bgcolor: '#f8f9fa' }}>
+        {success && (
+          <Alert severity="success" sx={{ mb: 3, borderRadius: 2, fontWeight: 800 }}>
+            ¡Datos guardados con éxito! El documento ha sido generado y subido al legajo digital.
+          </Alert>
+        )}
+
         <Typography variant="body2" color="textSecondary" sx={{ mb: 4, fontWeight: 500 }}>
           Al completar esta ficha, autorizás al Grupo Scout a utilizar imágenes de las actividades donde participe {scout.nombre} con fines institucionales y pedagógicos.
         </Typography>
@@ -119,41 +156,31 @@ export const FichaUsoImagenForm = ({ open, onClose, scout, onSave }) => {
         </Paper>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, bgcolor: '#f8f9fa' }} className="no-print">
-        <Button onClick={onClose} sx={{ fontWeight: 800, color: 'text.secondary' }}>Cancelar</Button>
-        <Button 
-          variant="contained" 
-          onClick={handleGuardar} 
-          startIcon={<Save />} 
-          sx={{ bgcolor: '#e65100', fontWeight: 900, px: 4, borderRadius: 2, '&:hover': { bgcolor: '#bf4300' } }}
-        >
-          Guardar Autorización
+      <DialogActions sx={{ p: 3, bgcolor: '#f8f9fa' }}>
+        <Button onClick={onClose} sx={{ fontWeight: 900, color: 'text.secondary', mr: 'auto' }}>
+          Cerrar
         </Button>
+        
         <Button 
           variant="outlined" 
           onClick={handlePrint} 
-          startIcon={<Print />} 
+          startIcon={<Visibility />} 
           color="warning" 
           sx={{ fontWeight: 800, borderRadius: 2 }}
         >
-          Imprimir
+          Ver Documento
+        </Button>
+
+        <Button 
+          variant="contained" 
+          onClick={handleGuardar} 
+          disabled={loading || success}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (success ? <CheckCircle /> : <Save />)} 
+          sx={{ bgcolor: success ? '#4caf50' : '#e65100', fontWeight: 900, px: 4, borderRadius: 2, '&:hover': { bgcolor: '#bf4300' } }}
+        >
+          {loading ? 'Generando PDF...' : (success ? '¡Guardado!' : 'Guardar y Generar')}
         </Button>
       </DialogActions>
-
-      {/* ÁREA DE IMPRESIÓN */}
-      <Box className="area-imprimible" sx={{ display: 'none' }}>
-        <FichaUsoImagenTemplate scout={scout} datos={formData} />
-      </Box>
-
-      <style>{`
-        @media print {
-          @page { margin: 0; size: A4 portrait; }
-          body * { visibility: hidden; }
-          .no-print { display: none !important; }
-          .area-imprimible { display: block !important; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: white; }
-          .area-imprimible, .area-imprimible * { visibility: visible; }
-        }
-      `}</style>
     </Dialog>
   );
 };

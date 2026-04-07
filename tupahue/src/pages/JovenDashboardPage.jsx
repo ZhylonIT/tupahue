@@ -10,7 +10,7 @@ import { MiRamaView } from '../views/joven/MiRamaView';
 import { MisFinanzasJovenView } from '../views/joven/MisFinanzasJovenView';
 import { MisProyectosView } from '../views/joven/MisProyectosView';
 import { DocumentacionView } from '../views/familia/DocumentacionView'; 
-import { PerfilView } from '../views/PerfilView'; // 🎯 Importamos el Perfil Global
+import { PerfilView } from '../views/PerfilView'; 
 
 const DRAWER_WIDTH = 280;
 
@@ -63,7 +63,7 @@ export const JovenDashboardPage = () => {
         
         {state.loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>
-        ) : !yo && !isDevMode && vistaActual !== 'PERFIL' ? ( // 🎯 Permitimos perfil aunque no haya ficha
+        ) : !yo && !isDevMode && vistaActual !== 'PERFIL' ? ( 
           <Container maxWidth="md">
             <Alert severity="warning" sx={{ borderRadius: 4, fontWeight: 700, mt: 4 }}>
               Tu usuario no está vinculado a una ficha de beneficiario activa.
@@ -71,9 +71,7 @@ export const JovenDashboardPage = () => {
           </Container>
         ) : (
           <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
-            {/* 🎯 GESTIÓN DE VISTAS INCLUYENDO PERFIL */}
             {vistaActual === 'PERFIL' && <PerfilView />}
-            
             {vistaActual === 'MI_RAMA' && <MiRamaView joven={yo} eventos={state.eventos} proyectos={state.proyectos} />}
             {vistaActual === 'PROGRESION' && <MiProgresionView joven={yo} />}            
             {vistaActual === 'PROYECTOS' && (
@@ -83,10 +81,17 @@ export const JovenDashboardPage = () => {
                 onMarkAsSeen={state.handlers.handleMarcarProyectoVisto} 
               />
             )}
+            
+            {/* 🎯 DOCUMENTACIÓN PARA ROVERS */}
             {yo?.rama?.toUpperCase() === 'ROVERS' && (
               <>
                 {vistaActual === 'FINANZAS' && <MisFinanzasJovenView joven={yo} />}
-                {vistaActual === 'DOCUMENTACION' && <DocumentacionView hijo={yo} />}
+                {vistaActual === 'DOCUMENTACION' && (
+                  <DocumentacionView 
+                    hijo={yo} 
+                    onUpdateScout={state.handleSaveScout} // 🎯 Conectamos la persistencia del hook
+                  />
+                )}
               </>
             )}
           </Box>

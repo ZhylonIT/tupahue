@@ -1,21 +1,21 @@
-import { useState } from 'react';
-import { 
-  Box, Typography, Grid, Card, CardContent, TextField, 
-  Avatar, Stack, Chip, Divider, Button, 
+import { useState, useEffect } from 'react';
+import {
+  Box, Typography, Grid, Card, CardContent, TextField,
+  Avatar, Stack, Chip, Divider, Button,
   Dialog, DialogTitle, DialogContent, IconButton, List, ListItem, ListItemIcon, ListItemText, CircularProgress
 } from '@mui/material';
-import { 
-  LocalHospital, ErrorOutline, CheckCircle, AssignmentInd, FolderOpen, 
+import {
+  LocalHospital, ErrorOutline, CheckCircle, AssignmentInd, FolderOpen,
   PictureAsPdf, Close, HistoryEdu, Description, CloudDownload
 } from '@mui/icons-material';
 
 import { useDocumentos } from './useDocumentos';
 import { RAMAS } from '../../../constants/ramas';
 import { FichaScout } from '../../../components/FichaScout';
-import { FirmaDigitalModal } from '../../../components/FirmaDigitalModal'; 
+import { FirmaDigitalModal } from '../../../components/FirmaDigitalModal';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../context/AuthContext';
-import { descargarZipLegajos } from '../../../services/zipLegajos'; 
+import { descargarZipLegajos } from '../../../services/zipLegajos';
 
 const NOMBRES_DOCUMENTOS = {
   ingreso_menores: 'Autorización de Ingreso (<18 años)',
@@ -43,19 +43,19 @@ const LegajoCard = ({ scout, ramaScout, esVistaGlobal, isCompleto, requiereFirma
   const cantDocs = scout.documentos?.length || 0;
 
   return (
-    <Card sx={{ 
-      borderRadius: 4, 
-      border: requiereFirma ? '2px solid #ff9800' : (isCompleto ? '1px solid #eee' : `1px solid #e0e0e0`), 
-      boxShadow: requiereFirma ? '0px 4px 15px rgba(255, 152, 0, 0.2)' : 'none', 
+    <Card sx={{
+      borderRadius: 4,
+      border: requiereFirma ? '2px solid #ff9800' : (isCompleto ? '1px solid #eee' : `1px solid #e0e0e0`),
+      boxShadow: requiereFirma ? '0px 4px 15px rgba(255, 152, 0, 0.2)' : 'none',
       position: 'relative', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 2 }
     }}>
       {requiereFirma && (
-        <Chip 
-          icon={<HistoryEdu style={{ color: 'white', fontSize: '1rem' }} />} label="PENDIENTE AVAL" size="small" 
-          sx={{ position: 'absolute', top: 12, right: 12, bgcolor: '#ff9800', color: 'white', fontWeight: 800, fontSize: '0.65rem' }} 
+        <Chip
+          icon={<HistoryEdu style={{ color: 'white', fontSize: '1rem' }} />} label="PENDIENTE AVAL" size="small"
+          sx={{ position: 'absolute', top: 12, right: 12, bgcolor: '#ff9800', color: 'white', fontWeight: 800, fontSize: '0.65rem' }}
         />
       )}
-      
+
       <CardContent>
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
           <Avatar sx={{ bgcolor: isCompleto ? ramaScout.color : '#bdbdbd', fontWeight: 700 }}>
@@ -82,12 +82,12 @@ const LegajoCard = ({ scout, ramaScout, esVistaGlobal, isCompleto, requiereFirma
         </Box>
 
         <Stack spacing={1} sx={{ mt: 2 }}>
-          <Button 
-            fullWidth variant={requiereFirma ? "contained" : "outlined"} 
-            startIcon={requiereFirma ? <HistoryEdu /> : <Description />} 
-            onClick={() => onOpenExpediente(scout)} 
-            sx={{ 
-              borderRadius: 2, textTransform: 'none', fontWeight: 700, 
+          <Button
+            fullWidth variant={requiereFirma ? "contained" : "outlined"}
+            startIcon={requiereFirma ? <HistoryEdu /> : <Description />}
+            onClick={() => onOpenExpediente(scout)}
+            sx={{
+              borderRadius: 2, textTransform: 'none', fontWeight: 700,
               bgcolor: requiereFirma ? '#ff9800' : 'transparent', color: requiereFirma ? 'white' : 'text.primary'
             }}
           >
@@ -102,41 +102,35 @@ const LegajoCard = ({ scout, ramaScout, esVistaGlobal, isCompleto, requiereFirma
   );
 };
 
+// ... (dentro de DocumentosView.jsx, reemplazá el componente ArchivosModal)
+
 const ArchivosModal = ({ open, onClose, scout }) => {
   const [loading, setLoading] = useState(false);
+  const [listaArchivos, setListaArchivos] = useState({}); // { docId: [archivos] }
 
-  const handleVerArchivo = async (docId) => {
-    setLoading(true);
-    try {
-      let filePath = "";
-
-      // 🎯 LÓGICA DE LECTURA PURA: Todos los archivos se buscan en Supabase
-      if (docId === 'ficha_medica' || docId === 'ficha_personales') {
-        // Los PDFs generados por el padre se guardan con el mismo nombre que la carpeta
-        filePath = `${scout.id}/${docId}/${docId}.pdf`;
-      } else {
-        // Archivos adjuntados (Fotos, DNI)
-        const folderPath = `${scout.id}/${docId}`;
-        const { data: fileList, error: listError } = await supabase.storage.from('documentos').list(folderPath);
-        if (listError) throw listError;
-        
-        const validFiles = fileList ? fileList.filter(f => f.name !== '.emptyFolderPlaceholder') : [];
-        if (validFiles.length === 0) throw new Error("Archivo no encontrado");
-
-        const newestFile = validFiles.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-        filePath = `${folderPath}/${newestFile.name}`;
-      }
-
-      // Buscamos en Storage y forzamos refresco de caché
-      const { data } = supabase.storage.from('documentos').getPublicUrl(filePath);
-      window.open(`${data.publicUrl}?t=${new Date().getTime()}`, '_blank');
-
-    } catch (error) {
-      console.error("Error al buscar archivo:", error);
-      alert("El documento no se encuentra en la base de datos. Puede que la familia aún no lo haya generado o subido.");
-    } finally {
-      setLoading(false);
+  // Cargamos la lista de archivos reales de todas las carpetas al abrir
+  useEffect(() => {
+    if (open && scout?.documentos) {
+      cargarTodosLosArchivos();
     }
+  }, [open, scout]);
+
+  const cargarTodosLosArchivos = async () => {
+    setLoading(true);
+    let mapa = {};
+    for (const docId of scout.documentos) {
+      const folderPath = `${scout.id}/${docId}`;
+      const { data } = await supabase.storage.from('documentos').list(folderPath);
+      mapa[docId] = data?.filter(f => f.name !== '.emptyFolderPlaceholder') || [];
+    }
+    setListaArchivos(mapa);
+    setLoading(false);
+  };
+
+  const handleVerArchivo = (docId, fileName) => {
+    const filePath = `${scout.id}/${docId}/${fileName}`;
+    const { data } = supabase.storage.from('documentos').getPublicUrl(filePath);
+    window.open(`${data.publicUrl}?t=${new Date().getTime()}`, '_blank');
   };
 
   return (
@@ -144,35 +138,40 @@ const ArchivosModal = ({ open, onClose, scout }) => {
       <DialogTitle sx={{ m: 0, p: 2, bgcolor: '#455a64', color: 'white' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FolderOpen /> Legajo de {scout?.nombre}
+            <FolderOpen /> Archivos de {scout?.nombre}
           </Typography>
           <IconButton onClick={onClose} sx={{ color: 'white' }}><Close /></IconButton>
         </Stack>
       </DialogTitle>
-      <DialogContent sx={{ p: 0 }}>
-        <List>
-          {scout?.documentos?.map((docId, i) => (
-            <Box key={docId}>
-              <ListItem sx={{ py: 2 }}>
-                <ListItemIcon><PictureAsPdf color="error" fontSize="large" /></ListItemIcon>
-                <ListItemText 
-                  primary={<Typography sx={{ fontWeight: 700 }}>{NOMBRES_DOCUMENTOS[docId] || docId}</Typography>} 
-                  secondary="Archivo validado en la nube" 
-                />
-                <Button 
-                  variant="contained" 
-                  size="small" 
-                  onClick={() => handleVerArchivo(docId)} 
-                  disabled={loading} 
-                  sx={{ bgcolor: '#455a64', borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-                >
-                  {loading ? 'Buscando...' : 'Ver Archivo'}
-                </Button>
-              </ListItem>
-              {i < scout.documentos.length - 1 && <Divider />}
-            </Box>
-          ))}
-        </List>
+      <DialogContent sx={{ p: 0, maxHeight: '70vh' }}>
+        {loading ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+        ) : (
+          <List>
+            {scout?.documentos?.map((docId) => (
+              <Box key={docId} sx={{ mb: 1 }}>
+                <Typography variant="caption" sx={{ px: 2, pt: 1, fontWeight: 900, color: 'text.secondary', display: 'block', bgcolor: '#f5f5f5' }}>
+                  {NOMBRES_DOCUMENTOS[docId] || docId.toUpperCase()}
+                </Typography>
+                {listaArchivos[docId]?.length > 0 ? (
+                  listaArchivos[docId].map((file) => (
+                    <ListItem key={file.name} sx={{ py: 1 }}>
+                      <ListItemIcon><PictureAsPdf color="error" /></ListItemIcon>
+                      <ListItemText
+                        primary={file.name.split('_').slice(1).join('_') || file.name}
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                      />
+                      <Button size="small" onClick={() => handleVerArchivo(docId, file.name)}>Ver</Button>
+                    </ListItem>
+                  ))
+                ) : (
+                  <Typography variant="caption" sx={{ px: 2, pb: 1, fontStyle: 'italic' }}>Sin archivos</Typography>
+                )}
+                <Divider />
+              </Box>
+            ))}
+          </List>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -220,9 +219,9 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
         </Box>
         <Stack direction="row" spacing={2}>
           <TextField placeholder="Filtrar por nombre o DNI..." size="small" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} sx={{ width: 250 }} />
-          <Button 
-            variant="contained" 
-            startIcon={isZipping ? <CircularProgress size={20} color="inherit" /> : <CloudDownload />} 
+          <Button
+            variant="contained"
+            startIcon={isZipping ? <CircularProgress size={20} color="inherit" /> : <CloudDownload />}
             onClick={handleDownloadRama}
             disabled={isZipping || scoutsFiltrados.length === 0}
             sx={{ bgcolor: CONFIG_RAMA.color, fontWeight: 800, borderRadius: 2 }}
@@ -235,13 +234,13 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
       <Grid container spacing={3}>
         {scoutsFiltrados.map((scout) => (
           <Grid item xs={12} md={6} lg={4} key={scout.id}>
-            <LegajoCard 
-              scout={scout} 
-              ramaScout={RAMAS[scout.rama?.toUpperCase()] || CONFIG_RAMA} 
-              esVistaGlobal={esVistaGlobal} 
-              isCompleto={legajoCompleto(scout)} 
+            <LegajoCard
+              scout={scout}
+              ramaScout={RAMAS[scout.rama?.toUpperCase()] || CONFIG_RAMA}
+              esVistaGlobal={esVistaGlobal}
+              isCompleto={legajoCompleto(scout)}
               requiereFirma={requiereFirmaIngreso(scout)}
-              onOpenExpediente={(s) => { setScoutSeleccionado(s); setExpedienteOpen(true); }} 
+              onOpenExpediente={(s) => { setScoutSeleccionado(s); setExpedienteOpen(true); }}
               onOpenDocs={(s) => { setScoutSeleccionado(s); setDocsModalOpen(true); }}
               onDownloadSingle={(s) => descargarZipLegajos([s], `Legajo_${s.apellido}`)}
             />

@@ -4,6 +4,9 @@ import { FUNCIONES, ROLES } from '../constants/auth';
 
 const AuthContext = createContext();
 
+// Limpieza absoluta de DNI
+const sanitizeDni = (val) => String(val || '').replace(/\D/g, '').trim();
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userFuncion, setUserFuncion] = useState(null);
@@ -35,14 +38,16 @@ export const AuthProvider = ({ children }) => {
             .maybeSingle();
 
           if (!scoutData && profileData.dni) {
+            const cleanDni = sanitizeDni(profileData.dni);
+            // Intento de reparación con búsqueda flexible
             const { data: repairData } = await supabase
               .from('scouts')
               .select('rama, user_id, dni')
-              .eq('dni', profileData.dni)
+              .ilike('dni', `%${cleanDni}%`)
               .maybeSingle();
             
             if (repairData) {
-              await supabase.from('scouts').update({ user_id: userId }).eq('dni', profileData.dni);
+              await supabase.from('scouts').update({ user_id: userId }).eq('dni', repairData.dni);
               scoutData = repairData;
             }
           }
@@ -69,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         setUserFuncion(funcionFinal);
       }
     } catch (e) { 
-      console.error("Error Auth:", e.message); 
+      console.error("Error Fetch Profile:", e.message); 
     } finally { 
       setAuthLoading(false); 
     }
@@ -93,7 +98,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 🎯 GESTIÓN DE SEGURIDAD (EMAIL Y PASSWORD)
   const updateEmail = async (newEmail) => {
     const { data, error } = await supabase.auth.updateUser({ email: newEmail });
     if (error) throw error;
@@ -132,48 +136,78 @@ export const AuthProvider = ({ children }) => {
 
   const register = async ({ email, password, dni, roleSolicitado, nombre, apellido, hijosDnis = [] }) => {
     setAuthLoading(true);
+    const cleanDni = sanitizeDni(dni);
+
     try {
-      let record = null;
-      const { data: existingProfile } = await supabase.from('profiles').select('*').eq('dni', dni).maybeSingle();
+      let scoutRecord = null;
       
       if (roleSolicitado === ROLES.JOVEN) {
-        const { data } = await supabase.from('scouts').select('*').eq('dni', dni).maybeSingle();
-        if (!data) throw new Error("DNI no está en nómina.");
-        record = data;
+        // 1. Diagnóstico: ¿La tabla scouts tiene activado RLS? 
+        // Si RLS está activo y no hay una política que permita leer a usuarios anónimos, nomadData siempre será null.
+        const { data: nomadData, error: nomadError } = await supabase
+          .from('scouts')
+          .select('*')
+          .ilike('dni', `%${cleanDni}%`)
+          .maybeSingle();
+        
+        if (nomadError) throw nomadError;
+
+        // SEGUNDO INTENTO: Si falló, probamos traer TODOS los scouts para ver si la tabla es legible
+        if (!nomadData) {
+          const { data: allScouts } = await supabase.from('scouts').select('dni').limit(5);
+          console.log("Muestra de tabla scouts (¿es legible?):", allScouts);
+          
+          throw new Error(`DNI ${cleanDni} no encontrado. Si estás seguro de que existe, verificá las políticas RLS en Supabase.`);
+        }
+        
+        scoutRecord = nomadData;
       }
 
+      // 2. Crear usuario en Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
       if (authError) throw authError;
       const uid = authData.user.id;
 
-      let fFinales = existingProfile?.funciones || [];
-      if (roleSolicitado === ROLES.JOVEN && record) {
-        fFinales.push(`PROTAGONISTA_${record.rama.toUpperCase()}`);
+      // 3. Determinar funciones
+      let fFinales = [];
+      if (roleSolicitado === ROLES.JOVEN && scoutRecord) {
+        fFinales.push(`PROTAGONISTA_${scoutRecord.rama.toUpperCase()}`);
       } else if (roleSolicitado === ROLES.FAMILIA || hijosDnis.length > 0) {
         fFinales.push(ROLES.FAMILIA);
       } else {
         fFinales.push(roleSolicitado);
       }
 
+      // 4. Upsert Perfil
       const perfil = {
         id: uid, 
-        dni, 
-        nombre: nombre || existingProfile?.nombre || record?.nombre, 
-        apellido: apellido || existingProfile?.apellido || record?.apellido,
-        role: existingProfile?.role || roleSolicitado,
+        dni: cleanDni, 
+        nombre: nombre || scoutRecord?.nombre || "", 
+        apellido: apellido || scoutRecord?.apellido || "",
+        role: roleSolicitado,
         funciones: [...new Set(fFinales)]
       };
 
-      if (existingProfile && existingProfile.id !== uid) {
-        await supabase.from('profiles').delete().eq('id', existingProfile.id);
+      await supabase.from('profiles').upsert(perfil);
+
+      // 5. Vincular
+      if (roleSolicitado === ROLES.JOVEN && scoutRecord) {
+        await supabase.from('scouts').update({ user_id: uid }).eq('dni', scoutRecord.dni);
       }
 
-      await supabase.from('profiles').upsert([perfil]);
-      if (roleSolicitado === ROLES.JOVEN) await supabase.from('scouts').update({ user_id: uid }).eq('dni', dni);
-      if (hijosDnis.length > 0) await supabase.from('scouts').update({ padre_id: uid }).in('dni', hijosDnis);
+      if (hijosDnis.length > 0) {
+        for (const hDni of hijosDnis) {
+          const cHDni = sanitizeDni(hDni);
+          const { data: hData } = await supabase.from('scouts').select('dni').ilike('dni', `%${cHDni}%`).maybeSingle();
+          if (hData) await supabase.from('scouts').update({ padre_id: uid }).eq('dni', hData.dni);
+        }
+      }
 
       await fetchUserProfile(uid);
-    } catch (e) { setAuthLoading(false); throw e; }
+    } catch (e) { 
+      setAuthLoading(false); 
+      throw e; 
+    }
   };
 
   const logout = async () => { setAuthLoading(true); await supabase.auth.signOut(); };
@@ -183,7 +217,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{ 
       user, userFuncion, availableFunciones, 
       login, register, logout, switchRole, 
-      updateProfile, updateEmail, updatePassword, // 🎯 Exportamos todo
+      updateProfile, updateEmail, updatePassword,
       authLoading 
     }}>
       {children}

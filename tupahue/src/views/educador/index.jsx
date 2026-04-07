@@ -33,7 +33,8 @@ export const EducadorMainView = ({
   proyectos = [], 
   handlers,
   userFuncion,
-  user 
+  user,
+  handleSaveScout // 🎯 RECIBE LA FUNCIÓN ACÁ
 }) => {
   
   const [hijoSeleccionadoId, setHijoSeleccionadoId] = useState(null);
@@ -58,7 +59,7 @@ export const EducadorMainView = ({
   const esVistaGlobal = ramaActiva === 'TODAS';
 
   switch (vistaActual) {
-    case 'PERFIL': // 🎯 NUEVO CASO
+    case 'PERFIL': 
       return <PerfilView />;
 
     case 'DASHBOARD': 
@@ -97,7 +98,8 @@ export const EducadorMainView = ({
       );
     
     case 'DOCUMENTACION':
-      if (userFuncion === ROLES.FAMILIA) return <DocumentacionFamiliaView hijo={hijoActivo} />;
+      // 🎯 PASAMOS LA FUNCIÓN PARA QUE EL MODAL LA PUEDA USAR
+      if (userFuncion === ROLES.FAMILIA) return <DocumentacionFamiliaView hijo={hijoActivo} onUpdateScout={handleSaveScout} />;
       return <Box>Vista de Documentos Educador</Box>;
     
     case 'NOMINA': 
