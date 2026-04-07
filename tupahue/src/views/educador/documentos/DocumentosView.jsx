@@ -21,8 +21,8 @@ const NOMBRES_DOCUMENTOS = {
   ingreso_menores: 'Autorización de Ingreso (<18 años)',
   fotocopias_dni: 'Fotocopias DNI (Padres e Hijo)',
   partida_nacimiento: 'Fotocopia Partida de Nacimiento',
-  ficha_medica: 'Ficha Médica Oficial (PDF)',
-  ficha_personales: 'Ficha de Datos Personales',
+  ficha_medica: 'Ficha Médica Oficial (SAAC)',
+  ficha_personales: 'Ficha de Datos Personales (SAAC)',
   salidas_cercanas: 'Autorización Salidas Cercanas',
   uso_imagen: 'Autorización Uso de Imagen',
   auto_campamento_menor: 'Autorización Salida/Campamento (Menores)',
@@ -52,7 +52,7 @@ const LegajoCard = ({ scout, ramaScout, esVistaGlobal, isCompleto, requiereFirma
       {requiereFirma && (
         <Chip 
           icon={<HistoryEdu style={{ color: 'white', fontSize: '1rem' }} />} label="PENDIENTE AVAL" size="small" 
-          sx={{ position: 'absolute', top: 12, right: 12, bgcolor: '#ff9800', color: 'white', fontWeight: 800, fontSize: '0.65rem', animation: 'pulse 2s infinite' }} 
+          sx={{ position: 'absolute', top: 12, right: 12, bgcolor: '#ff9800', color: 'white', fontWeight: 800, fontSize: '0.65rem' }} 
         />
       )}
       
@@ -88,13 +88,12 @@ const LegajoCard = ({ scout, ramaScout, esVistaGlobal, isCompleto, requiereFirma
             onClick={() => onOpenExpediente(scout)} 
             sx={{ 
               borderRadius: 2, textTransform: 'none', fontWeight: 700, 
-              bgcolor: requiereFirma ? '#ff9800' : 'transparent', color: requiereFirma ? 'white' : 'text.primary',
-              '&:hover': { bgcolor: requiereFirma ? '#e68a00' : `${ramaScout.color}10` }
+              bgcolor: requiereFirma ? '#ff9800' : 'transparent', color: requiereFirma ? 'white' : 'text.primary'
             }}
           >
             {requiereFirma ? 'Revisar y Avalar' : 'Ver Expediente'}
           </Button>
-          <Button fullWidth variant="text" startIcon={<FolderOpen />} disabled={cantDocs === 0} onClick={() => onOpenDocs(scout)} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, color: cantDocs > 0 ? 'text.secondary' : '#ccc' }}>
+          <Button fullWidth variant="text" startIcon={<FolderOpen />} disabled={cantDocs === 0} onClick={() => onOpenDocs(scout)} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
             Archivos Adjuntos ({cantDocs})
           </Button>
         </Stack>
@@ -111,39 +110,30 @@ const ArchivosModal = ({ open, onClose, scout }) => {
     try {
       let filePath = "";
 
-      // 🎯 CASO ESPECIAL: Ficha Médica y Ficha Personales (Nuevos motores vectoriales)
-      // Agregamos ficha_personales previendo el siguiente paso
+      // 🎯 LÓGICA DE LECTURA PURA: Todos los archivos se buscan en Supabase
       if (docId === 'ficha_medica' || docId === 'ficha_personales') {
+        // Los PDFs generados por el padre se guardan con el mismo nombre que la carpeta
         filePath = `${scout.id}/${docId}/${docId}.pdf`;
-        
-        // Verificamos si existe el archivo
-        const { data: exists } = await supabase.storage.from('documentos').list(`${scout.id}/${docId}`);
-        if (!exists || exists.length === 0) throw new Error("Archivo no generado");
-
       } else {
-        // 🎯 CASO GENERAL: Otros archivos adjuntos
+        // Archivos adjuntados (Fotos, DNI)
         const folderPath = `${scout.id}/${docId}`;
         const { data: fileList, error: listError } = await supabase.storage.from('documentos').list(folderPath);
-        
         if (listError) throw listError;
         
         const validFiles = fileList ? fileList.filter(f => f.name !== '.emptyFolderPlaceholder') : [];
-        if (validFiles.length === 0) throw new Error("Carpeta vacía");
+        if (validFiles.length === 0) throw new Error("Archivo no encontrado");
 
-        // Traemos el más reciente
         const newestFile = validFiles.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
         filePath = `${folderPath}/${newestFile.name}`;
       }
 
-      // 🎯 SOLUCIÓN ANTI-CACHÉ: Agregamos un timestamp a la URL
+      // Buscamos en Storage y forzamos refresco de caché
       const { data } = supabase.storage.from('documentos').getPublicUrl(filePath);
-      const urlFinal = `${data.publicUrl}?t=${new Date().getTime()}`;
-      
-      window.open(urlFinal, '_blank');
+      window.open(`${data.publicUrl}?t=${new Date().getTime()}`, '_blank');
 
     } catch (error) {
-      console.error("Error abriendo archivo:", error);
-      alert("No se encontró el archivo. Es posible que el padre aún no lo haya generado o cargado.");
+      console.error("Error al buscar archivo:", error);
+      alert("El documento no se encuentra en la base de datos. Puede que la familia aún no lo haya generado o subido.");
     } finally {
       setLoading(false);
     }
@@ -154,18 +144,12 @@ const ArchivosModal = ({ open, onClose, scout }) => {
       <DialogTitle sx={{ m: 0, p: 2, bgcolor: '#455a64', color: 'white' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FolderOpen /> Archivos de {scout?.nombre}
+            <FolderOpen /> Legajo de {scout?.nombre}
           </Typography>
           <IconButton onClick={onClose} sx={{ color: 'white' }}><Close /></IconButton>
         </Stack>
       </DialogTitle>
       <DialogContent sx={{ p: 0 }}>
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2, bgcolor: '#eceff1' }}>
-            <CircularProgress size={20} sx={{ color: '#455a64', mr: 1 }} />
-            <Typography variant="caption" sx={{ fontWeight: 700 }}>Abriendo documento...</Typography>
-          </Box>
-        )}
         <List>
           {scout?.documentos?.map((docId, i) => (
             <Box key={docId}>
@@ -173,7 +157,7 @@ const ArchivosModal = ({ open, onClose, scout }) => {
                 <ListItemIcon><PictureAsPdf color="error" fontSize="large" /></ListItemIcon>
                 <ListItemText 
                   primary={<Typography sx={{ fontWeight: 700 }}>{NOMBRES_DOCUMENTOS[docId] || docId}</Typography>} 
-                  secondary={docId === 'ficha_medica' || docId === 'ficha_personales' ? "Documento Digitalizado" : "Archivo Adjunto"} 
+                  secondary="Archivo validado en la nube" 
                 />
                 <Button 
                   variant="contained" 
@@ -182,7 +166,7 @@ const ArchivosModal = ({ open, onClose, scout }) => {
                   disabled={loading} 
                   sx={{ bgcolor: '#455a64', borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
                 >
-                  Ver Archivo
+                  {loading ? 'Buscando...' : 'Ver Archivo'}
                 </Button>
               </ListItem>
               {i < scout.documentos.length - 1 && <Divider />}
@@ -222,7 +206,7 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
       });
       setFirmaModalOpen(false);
       setExpedienteOpen(false);
-      alert("¡Avalado con éxito!");
+      alert("¡Legajo Avalado!");
     } catch (error) {
       alert("Error: " + error.message);
     }
@@ -232,15 +216,10 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
     <Box>
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems="center" sx={{ mb: 4 }} spacing={2}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900 }}>Gestión de Legajos: <span style={{ color: CONFIG_RAMA.color }}>{CONFIG_RAMA.nombre}</span></Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900 }}>Legajos Digitales: <span style={{ color: CONFIG_RAMA.color }}>{CONFIG_RAMA.nombre}</span></Typography>
         </Box>
         <Stack direction="row" spacing={2}>
-          <TextField 
-            placeholder="Buscar..." 
-            size="small" 
-            value={busqueda} 
-            onChange={(e) => setBusqueda(e.target.value)} 
-          />
+          <TextField placeholder="Filtrar por nombre o DNI..." size="small" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} sx={{ width: 250 }} />
           <Button 
             variant="contained" 
             startIcon={isZipping ? <CircularProgress size={20} color="inherit" /> : <CloudDownload />} 
@@ -248,7 +227,7 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
             disabled={isZipping || scoutsFiltrados.length === 0}
             sx={{ bgcolor: CONFIG_RAMA.color, fontWeight: 800, borderRadius: 2 }}
           >
-            {isZipping ? 'Zipeando...' : 'Descargar Rama'}
+            {isZipping ? 'Procesando Nube...' : 'Descargar Rama ZIP'}
           </Button>
         </Stack>
       </Stack>
@@ -270,21 +249,9 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
         ))}
       </Grid>
 
-      <FichaScout 
-        open={expedienteOpen} 
-        onClose={() => setExpedienteOpen(false)} 
-        scout={scoutSeleccionado} 
-        onAvalarIngreso={() => setFirmaModalOpen(true)} 
-      />
-      
+      <FichaScout open={expedienteOpen} onClose={() => setExpedienteOpen(false)} scout={scoutSeleccionado} onAvalarIngreso={() => setFirmaModalOpen(true)} />
       <ArchivosModal open={docsModalOpen} onClose={() => setDocsModalOpen(false)} scout={scoutSeleccionado} />
-      
-      <FirmaDigitalModal 
-        open={firmaModalOpen} 
-        onClose={() => setFirmaModalOpen(false)} 
-        onConfirm={handleConfirmarFirma} 
-        user={user} 
-      />
+      <FirmaDigitalModal open={firmaModalOpen} onClose={() => setFirmaModalOpen(false)} onConfirm={handleConfirmarFirma} user={user} />
     </Box>
   );
 };

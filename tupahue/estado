@@ -191,3 +191,20 @@ Sincronización de Colores y Cargos: Se corrigió la inversión de colores en la
 Seguridad en useDashboard: El hook ahora filtra estrictamente los datos. Un Joven solo ve su propia ficha y sus proyectos, y una Familia solo ve a sus hijos vinculados.
 
 Limpieza de UI: Se ocultó el selector de ramas para los perfiles que no lo necesitan (Familia y Protagonistas), dejando un Sidebar mucho más limpio.
+
+Resumen de Arquitectura: Ficha Médica y Documentos
+Motor PDF Nativo (pdfDrawers/fichaMedica.jsx): * Construido con jsPDF puro (coordenadas, líneas y textos).
+
+Cero fotos, cero html2canvas.
+
+Pesa solo ~150 KB, es texto seleccionable y replica exactamente la estética oficial de la planilla de SAAC de 2 columnas.
+
+Está preparado para recibir firmas/avales posteriores sin perder calidad.
+
+Rol de la Familia (FichaMedicaForm.jsx): * Es la única autorizada a "fabricar" el documento. Junta los datos, inyecta la firma del padre, genera el PDF y lo sube a Supabase como la Única Fuente de Verdad.
+
+Rol del Educador (DocumentosView.jsx / ArchivosModal): * Es un visor. Va ciegamente a Supabase a buscar el archivo .pdf ya generado.
+
+Tiene un "truco" anti-caché (?t=timestamp) para ver siempre la versión más reciente al instante. No dibuja nada, no gasta memoria.
+
+Descargas Masivas (zipLegajos.jsx): * Solo recopila y empaqueta los archivos físicos que ya existen en el Storage de Supabase. Rápido y sin estresar la PC del educador.

@@ -1,11 +1,9 @@
 import { Box, Typography, Grid, Divider } from '@mui/material';
-// Importamos el logo oficial desde tu carpeta de assets
 import logoSAAC from '../../assets/images/Logo_SAAC.png';
 
-export const FichaMedicaTemplate = ({ scout, datosMedicos }) => {
+export const FichaMedicaTemplate = ({ scout, datosMedicos, firmaPadre, datosPadre }) => {
   if (!scout || !datosMedicos) return null;
 
-  // Helpers visuales para la tabla impresa
   const RowCheck = ({ label, value }) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #000', py: 0.5, px: 1 }}>
       <Typography variant="body2" sx={{ fontSize: '11px' }}>{label}</Typography>
@@ -49,11 +47,9 @@ export const FichaMedicaTemplate = ({ scout, datosMedicos }) => {
         <Grid container>
           <Grid item xs={6}><RowText label="Apellido:" value={scout.apellido} /></Grid>
           <Grid item xs={6}><RowText label="Nombre:" value={scout.nombre} /></Grid>
-          {/* Tomamos la fecha de nacimiento directo del objeto scout */}
           <Grid item xs={6}><RowText label="Fecha de nacimiento:" value={scout.fechaNacimiento || scout.fecha_nacimiento || ''} /></Grid>
           <Grid item xs={6}><RowText label="De haber realizado un control médico indique fecha:" value={datosMedicos.fechaControl} /></Grid>
           <Grid item xs={3}><RowText label="D.N.I:" value={scout.dni} /></Grid>
-          {/* Datos del organismo fijos */}
           <Grid item xs={3}><RowText label="N° Zona:" value="8" /></Grid>
           <Grid item xs={3}><RowText label="N° Distrito:" value="3" /></Grid>
           <Grid item xs={3}><RowText label="N° Grupo:" value="996" /></Grid>
@@ -67,9 +63,7 @@ export const FichaMedicaTemplate = ({ scout, datosMedicos }) => {
         La información que Ud. se dispone a llenar y que acompañará a su hijo/a o a usted durante todas las actividades, contempla una serie de datos y antecedentes que orientarán al personal de salud actuante en caso de necesidad.
       </Typography>
 
-      {/* COLUMNAS: SÍ/NO y PREGUNTAS CLÍNICAS */}
       <Grid container spacing={2}>
-        
         {/* COLUMNA IZQUIERDA */}
         <Grid item xs={6}>
           <Typography variant="body2" sx={{ fontSize: '11px', fontWeight: 'bold', mb: 1 }}>Conteste las siguientes situaciones (Indicar con SI o NO)</Typography>
@@ -97,7 +91,6 @@ export const FichaMedicaTemplate = ({ scout, datosMedicos }) => {
             <RowText label="Triple Bacteriana Celular:" value={datosMedicos.vacunaTripleCelular} />
             <RowText label="Triple Bacteriana Acelular:" value={datosMedicos.vacunaTripleAcelular} />
             <RowText label="Doble Bacteriana:" value={datosMedicos.vacunaDoble} />
-            {/* Nuevo checkbox añadido aquí */}
             <RowCheck label="Calendario de vacunación completo" value={datosMedicos.calendarioCompleto} />
             <RowCheck label="No tiene las vacunas mencionadas" value={datosMedicos.noTieneVacunas} />
             <RowCheck label="No sabe/no contesta" value={datosMedicos.noSabeVacunas} />
@@ -136,7 +129,6 @@ export const FichaMedicaTemplate = ({ scout, datosMedicos }) => {
         </Grid>
       </Grid>
 
-      {/* OBRA SOCIAL Y FIRMAS */}
       <Box sx={{ border: '1px solid black', mt: 2 }}>
         <Grid container>
           <Grid item xs={12}><RowText label="Obra Social o Prepaga:" value={datosMedicos.obraSocial} /></Grid>
@@ -149,21 +141,26 @@ export const FichaMedicaTemplate = ({ scout, datosMedicos }) => {
         Declaro bajo juramento que toda la información aquí aportada es verídica y de sufrir alguna modificación de los datos o de hechos nuevos, asumo el compromiso de informarla a la brevedad.
       </Typography>
 
-      {/* SECCIÓN DE FIRMAS CORREGIDA */}
-      <Grid container spacing={4} sx={{ mt: 5, px: 2 }}>
-        {/* Espacio para la firma */}
-        <Grid item xs={5} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+      {/* 🎯 SECCIÓN DE FIRMA AUTOMATIZADA */}
+      <Grid container spacing={4} sx={{ mt: 2, px: 2, alignItems: 'flex-end' }}>
+        <Grid item xs={5} sx={{ textAlign: 'center' }}>
+          {/* Renderizado de la firma si existe */}
+          <Box sx={{ height: '60px', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', mb: 0.5 }}>
+            {firmaPadre ? (
+              <img src={firmaPadre} alt="Firma Digital" style={{ maxHeight: '60px', maxWidth: '180px', objectFit: 'contain' }} />
+            ) : (
+              <Box sx={{ width: '100%', height: '1px', bgcolor: 'transparent' }} />
+            )}
+          </Box>
           <Box sx={{ borderBottom: '1px solid black', width: '100%' }}></Box>
-          <Typography variant="body2" sx={{ fontSize: '11px', mt: 0.5 }}>Firma Adulto/Madre/Padre/Tutor</Typography>
+          <Typography variant="body2" sx={{ fontSize: '10px', mt: 0.5, fontWeight: 'bold' }}>Firma Adulto/Madre/Padre/Tutor</Typography>
         </Grid>
         
-        {/* Espaciador central */}
         <Grid item xs={1}></Grid>
 
-        {/* Datos de aclaración */}
         <Grid item xs={6}>
-          <RowText label="Aclaración:" value="" />
-          <RowText label="DNI:" value="" />
+          <RowText label="Aclaración:" value={datosPadre?.aclaracion || ''} />
+          <RowText label="DNI:" value={datosPadre?.dni || ''} />
           <RowText label="Fecha:" value={new Date().toLocaleDateString('es-AR')} />
         </Grid>
       </Grid>
