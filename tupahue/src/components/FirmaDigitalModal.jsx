@@ -1,50 +1,52 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
-  Button, Box, Typography, Stack, Tabs, Tab, IconButton
+  Button, Box, Typography, Stack, Tabs, Tab, IconButton, TextField
 } from '@mui/material';
-import { Gesture, UploadFile, Delete, Close } from '@mui/icons-material';
+import { Gesture, UploadFile, Delete, Close, VerifiedUser } from '@mui/icons-material';
 
 export const FirmaDigitalModal = ({ open, onClose, onConfirm, user, titulo = "Configuración de Firma Digital" }) => {
-  const [tab, setTab] = useState(0); // 0: Dibujar, 1: Subir
+  const [tab, setTab] = useState(0); 
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [imgPreview, setImgPreview] = useState(null);
+  
+  const [datosPersona, setDatosPersona] = useState({
+    aclaracion: '',
+    dni: ''
+  });
 
   useEffect(() => {
     if (open) {
       setImgPreview(user?.firma_url || null);
-      if (tab === 0) handleClear();
+      setDatosPersona({
+        aclaracion: user ? `${user.nombre} ${user.apellido}` : '',
+        dni: user?.dni || ''
+      });
+      if (tab === 0) setTimeout(handleClear, 100);
     }
   }, [open, user, tab]);
 
-  // --- Lógica de Dibujo ---
   const getCoordinates = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return { offsetX: 0, offsetY: 0 };
     const rect = canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      offsetX: clientX - rect.left,
-      offsetY: clientY - rect.top
-    };
+    return { offsetX: clientX - rect.left, offsetY: clientY - rect.top };
   };
 
   const startDrawing = (e) => {
     const { offsetX, offsetY } = getCoordinates(e);
     const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(offsetX, offsetY);
-    setIsDrawing(true);
+    ctx.beginPath(); ctx.moveTo(offsetX, offsetY); setIsDrawing(true);
   };
 
   const draw = (e) => {
     if (!isDrawing) return;
     const { offsetX, offsetY } = getCoordinates(e);
     const ctx = canvasRef.current.getContext('2d');
-    ctx.lineTo(offsetX, offsetY);
-    ctx.stroke();
+    ctx.lineTo(offsetX, offsetY); ctx.stroke();
   };
 
   const handleClear = () => {
@@ -52,13 +54,10 @@ export const FirmaDigitalModal = ({ open, onClose, onConfirm, user, titulo = "Co
     if (canvas) {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#000';
     }
   };
 
-  // --- Lógica de Carga de Archivo ---
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -70,41 +69,38 @@ export const FirmaDigitalModal = ({ open, onClose, onConfirm, user, titulo = "Co
 
   const handleSave = () => {
     let firmaFinal = null;
-    
     if (tab === 0) {
       const canvas = canvasRef.current;
-      // Convertimos el dibujo a imagen
       firmaFinal = canvas.toDataURL('image/png');
     } else {
       firmaFinal = imgPreview;
     }
 
-    if (!firmaFinal) {
-      alert("Por favor, dibuja tu firma o sube un archivo.");
-      return;
-    }
+    if (!firmaFinal) { alert("Por favor, dibuja tu firma o sube un archivo."); return; }
+    if (!datosPersona.aclaracion || !datosPersona.dni) { alert("Por favor, completa tu nombre y DNI para el aval."); return; }
 
-    // Enviamos solo la imagen de la firma
-    onConfirm({ firmaImg: firmaFinal });
+    onConfirm({ 
+      firmaImg: firmaFinal,
+      aclaracion: datosPersona.aclaracion,
+      dni: datosPersona.dni
+    });
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
       <DialogTitle sx={{ bgcolor: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Stack direction="row" spacing={1} alignItems="center">
-          <Gesture color="primary" />
+          <VerifiedUser color="primary" />
           <Typography variant="h6" sx={{ fontWeight: 700 }}>{titulo}</Typography>
         </Stack>
         <IconButton onClick={onClose} size="small"><Close /></IconButton>
       </DialogTitle>
 
       <DialogContent sx={{ mt: 2 }}>
-        <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
-          {user?.nombre} {user?.apellido}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Esta firma se estampará en los documentos oficiales. Asegurate de que sea clara y representativa.
-        </Typography>
+        <Stack spacing={2} sx={{ mb: 3 }}>
+          <TextField label="Nombre y Apellido del Firmante" fullWidth size="small" value={datosPersona.aclaracion} onChange={(e) => setDatosPersona({...datosPersona, aclaracion: e.target.value})} />
+          <TextField label="DNI" fullWidth size="small" value={datosPersona.dni} onChange={(e) => setDatosPersona({...datosPersona, dni: e.target.value})} />
+        </Stack>
 
         <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 2 }}>
           <Tab icon={<Gesture />} label="Dibujar" sx={{ fontWeight: 700 }} />
@@ -113,22 +109,8 @@ export const FirmaDigitalModal = ({ open, onClose, onConfirm, user, titulo = "Co
 
         {tab === 0 ? (
           <Box sx={{ border: '2px dashed #ccc', borderRadius: 2, bgcolor: '#fff', touchAction: 'none', position: 'relative' }}>
-            <canvas
-              ref={canvasRef}
-              width={500}
-              height={200}
-              style={{ width: '100%', height: '200px', cursor: 'crosshair' }}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={() => setIsDrawing(false)}
-              onMouseLeave={() => setIsDrawing(false)}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={() => setIsDrawing(false)}
-            />
-            <Button size="small" onClick={handleClear} startIcon={<Delete />} color="error" sx={{ position: 'absolute', bottom: 5, right: 5 }}>
-              Limpiar
-            </Button>
+            <canvas ref={canvasRef} width={500} height={200} style={{ width: '100%', height: '200px', cursor: 'crosshair' }} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => setIsDrawing(false)} onMouseLeave={() => setIsDrawing(false)} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => setIsDrawing(false)} />
+            <Button size="small" onClick={handleClear} startIcon={<Delete />} color="error" sx={{ position: 'absolute', bottom: 5, right: 5 }}>Limpiar</Button>
           </Box>
         ) : (
           <Box sx={{ border: '2px dashed #ccc', borderRadius: 2, p: 3, textAlign: 'center', bgcolor: '#fdfdfd' }}>
@@ -139,8 +121,7 @@ export const FirmaDigitalModal = ({ open, onClose, onConfirm, user, titulo = "Co
               </Stack>
             ) : (
               <Button component="label" variant="contained" startIcon={<UploadFile />}>
-                Seleccionar Firma (PNG/JPG)
-                <input type="file" hidden accept="image/*" onChange={handleFileChange} />
+                Seleccionar Firma <input type="file" hidden accept="image/*" onChange={handleFileChange} />
               </Button>
             )}
           </Box>
@@ -149,9 +130,7 @@ export const FirmaDigitalModal = ({ open, onClose, onConfirm, user, titulo = "Co
 
       <DialogActions sx={{ p: 2, bgcolor: '#f8f9fa', borderTop: '1px solid #eee' }}>
         <Button onClick={onClose} color="inherit" sx={{ fontWeight: 700 }}>Cancelar</Button>
-        <Button onClick={handleSave} variant="contained" sx={{ fontWeight: 900, px: 4, borderRadius: 2 }}>
-          Guardar Firma
-        </Button>
+        <Button onClick={handleSave} variant="contained" sx={{ fontWeight: 900, px: 4, borderRadius: 2 }}>Avalar Legajo</Button>
       </DialogActions>
     </Dialog>
   );

@@ -62,7 +62,7 @@ export const DashboardPage = () => {
           userFuncion={userFuncion} 
           adultos={state.adultos}
           user={user} 
-          handleSaveScout={state.handleSaveScout} // 🎯 AHORA PASA LA FUNCIÓN DE GUARDADO AL MAIN VIEW
+          handleSaveScout={state.handleSaveScout} // 🎯 PASO LIMPIO DE FUNCIÓN
         />
         
         <DashboardModals state={state} handleSaveScout={state.handleSaveScout} />

@@ -14,7 +14,6 @@ import { RevisionProyectosView } from './proyectos/RevisionProyectosView';
 import { PerfilView } from '../PerfilView';
 import { Box } from '@mui/material';
 
-// Vistas de Familia
 import { MisHijosView } from '../familia/MisHijosView';
 import { FinanzasView as FinanzasFamiliaView } from '../familia/FinanzasView';
 import { DocumentacionView as DocumentacionFamiliaView } from '../familia/DocumentacionView';
@@ -34,7 +33,7 @@ export const EducadorMainView = ({
   handlers,
   userFuncion,
   user,
-  handleSaveScout // 🎯 RECIBE LA FUNCIÓN ACÁ
+  handleSaveScout 
 }) => {
   
   const [hijoSeleccionadoId, setHijoSeleccionadoId] = useState(null);
@@ -59,8 +58,7 @@ export const EducadorMainView = ({
   const esVistaGlobal = ramaActiva === 'TODAS';
 
   switch (vistaActual) {
-    case 'PERFIL': 
-      return <PerfilView />;
+    case 'PERFIL': return <PerfilView />;
 
     case 'DASHBOARD': 
       if (userFuncion === ROLES.FAMILIA) {
@@ -75,15 +73,7 @@ export const EducadorMainView = ({
           />
         );
       }
-      return (
-        <DashboardView 
-          scouts={scoutsFiltrados} 
-          eventos={eventos} 
-          proyectos={proyectos} 
-          setVistaActual={setVistaActual}
-          {...commonProps} 
-        />
-      );
+      return <DashboardView scouts={scoutsFiltrados} eventos={eventos} proyectos={proyectos} setVistaActual={setVistaActual} {...commonProps} />;
 
     case 'MIS_HIJOS':
       return (
@@ -98,9 +88,8 @@ export const EducadorMainView = ({
       );
     
     case 'DOCUMENTACION':
-      // 🎯 PASAMOS LA FUNCIÓN PARA QUE EL MODAL LA PUEDA USAR
       if (userFuncion === ROLES.FAMILIA) return <DocumentacionFamiliaView hijo={hijoActivo} onUpdateScout={handleSaveScout} />;
-      return <Box>Vista de Documentos Educador</Box>;
+      return <Box sx={{ p: 3 }}>Vista de Documentos Educador</Box>;
     
     case 'NOMINA': 
     case 'NOMINA_GLOBAL': 
@@ -129,70 +118,32 @@ export const EducadorMainView = ({
       );
 
     case 'PLANIFICACIONES':
-      return (
-        <PlanificacionesView 
-          ramaId={ramaActiva} 
-          {...commonProps} 
-          scouts={esVistaGlobal ? scouts : scoutsFiltrados} 
-          adultos={adultos} 
-        />
-      );
+      return <PlanificacionesView ramaId={ramaActiva} {...commonProps} scouts={esVistaGlobal ? scouts : scoutsFiltrados} adultos={adultos} />;
 
     case 'REVISION_PROYECTOS':
-      return (
-        <RevisionProyectosView 
-          proyectos={proyectos} 
-          onReview={handlers.handleReviewProyecto}
-          esVistaGlobal={esVistaGlobal}
-          {...commonProps} 
-        />
-      );
+      return <RevisionProyectosView proyectos={proyectos} onReview={handlers.handleReviewProyecto} esVistaGlobal={esVistaGlobal} {...commonProps} />;
 
     case 'CALENDARIO':
-      return (
-        <CalendarioView 
-          eventos={eventos} 
-          {...commonProps} 
-          onAddEvento={handlers.handleAddEvento}
-          onDeleteEvento={handlers.handleDeleteEvento} 
-        />
-      );
+      return <CalendarioView eventos={eventos} {...commonProps} onAddEvento={handlers.handleAddEvento} onDeleteEvento={handlers.handleDeleteEvento} />;
 
     case 'DOCUMENTOS': 
       return (
         <DocumentosView 
           scouts={scoutsFiltrados} 
           {...commonProps} 
-          onUpdateScout={handlers.handleUpdateEtapa} 
+          onUpdateScout={handleSaveScout} // 🎯 CORREGIDO: Usamos la función de guardado directo
         />
       );
 
-    case 'NOTICIAS':
-      return <NoticiasView {...commonProps} />;
-
+    case 'NOTICIAS': return <NoticiasView {...commonProps} />;
     case 'FINANZAS':
       if (userFuncion === ROLES.FAMILIA) return <FinanzasFamiliaView hijo={hijoActivo} />;
       return <FinanzasView scouts={scouts} {...commonProps} />;
+    case 'CUOTAS': return <CuotasView nomina={scouts} {...commonProps} />;
+    case 'PRESUPUESTO': return <PresupuestoView />;
+    case 'ADULTOS': return <AdultosView {...commonProps} />;
 
-    case 'CUOTAS':
-      return <CuotasView nomina={scouts} {...commonProps} />;
-
-    case 'PRESUPUESTO':
-      return <PresupuestoView />;
-
-    case 'ADULTOS':
-      return <AdultosView {...commonProps} />;
-
-    default: 
-      return (
-        <DashboardView 
-          scouts={scoutsFiltrados} 
-          eventos={eventos} 
-          proyectos={proyectos}
-          setVistaActual={setVistaActual}
-          {...commonProps} 
-        />
-      );
+    default: return <DashboardView scouts={scoutsFiltrados} eventos={eventos} proyectos={proyectos} setVistaActual={setVistaActual} {...commonProps} />;
   }
 };
 

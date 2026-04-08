@@ -9,7 +9,7 @@ import { FichaSalidasCercanasForm } from './FichaSalidasCercanasForm';
 import { FichaUsoImagenForm } from './FichaUsoImagenForm';
 import { FichaIngresoForm } from './FichaIngresoForm';
 import { FichaAutorizacionSalidaForm } from './FichaAutorizacionSalidaForm';
-import { FichaDDJJMayoresForm } from './FichaDDJJMayoresForm'; // 🎯 Importado
+import { FichaDDJJMayoresForm } from './FichaDDJJMayoresForm'; 
 
 // Importamos el gestor de archivos
 import { GestorArchivosModal } from './GestorArchivosModal';
@@ -60,10 +60,19 @@ export const DocumentacionView = ({ hijo, onUpdateScout }) => {
   const handleSaveForm = (hijoActualizado, docId) => {
     const docsDB = hijoActualizado.documentos || [];
     const nuevosDocs = [...new Set([...docsDB, docId])];    
+    
+    // 🎯 BLINDAJE DE SEGURIDAD LEGAL:
+    // Si se sube, edita o actualiza CUALQUIER documento, el aval del educador se cae.
     const pibeParaPersistir = {
       ...hijoActualizado,
-      documentos: nuevosDocs
+      documentos: nuevosDocs,
+      avaladoPorEducadores: false,
+      educadorAvalista: null,
+      educadorDNI: null,
+      firmaDigitalImg: null,
+      fechaAval: null
     };    
+    
     onUpdateScout(pibeParaPersistir);
   };
 
@@ -212,7 +221,7 @@ export const DocumentacionView = ({ hijo, onUpdateScout }) => {
       <FichaIngresoForm open={fichaIngresoOpen} onClose={() => setFichaIngresoOpen(false)} scout={hijo} onSave={(h) => handleSaveForm(h, 'ingreso_menores')} />
       <FichaAutorizacionSalidaForm open={fichaEventoOpen} onClose={() => setFichaEventoOpen(false)} scout={hijo} onSave={(h, id) => handleSaveForm(h, id)} />
       
-      {/* 🎯 GESTIÓN ROVER */}
+      {/* GESTIÓN ROVER */}
       <FichaDDJJMayoresForm open={fichaRoverOpen} onClose={() => setFichaRoverOpen(false)} scout={hijo} onSave={(h, id) => handleSaveForm(h, id)} />
     </Box>
   );

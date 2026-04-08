@@ -17,6 +17,14 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../context/AuthContext';
 import { descargarZipLegajos } from '../../../services/zipLegajos';
 
+// 🎯 IMPORTAMOS LOS GENERADORES DE PDF PARA RE-ARMARLOS
+import {
+  generarFichaIngresoPDF,
+  generarSalidasCercanasPDF,
+  generarAutorizacionEventoPDF,
+  generarDdjjMayoresPDF
+} from '../../../services/pdfService';
+
 const NOMBRES_DOCUMENTOS = {
   ingreso_menores: 'Autorización de Ingreso (<18 años)',
   fotocopias_dni: 'Fotocopias DNI (Padres e Hijo)',
@@ -102,13 +110,10 @@ const LegajoCard = ({ scout, ramaScout, esVistaGlobal, isCompleto, requiereFirma
   );
 };
 
-// ... (dentro de DocumentosView.jsx, reemplazá el componente ArchivosModal)
-
 const ArchivosModal = ({ open, onClose, scout }) => {
   const [loading, setLoading] = useState(false);
-  const [listaArchivos, setListaArchivos] = useState({}); // { docId: [archivos] }
+  const [listaArchivos, setListaArchivos] = useState({});
 
-  // Cargamos la lista de archivos reales de todas las carpetas al abrir
   useEffect(() => {
     if (open && scout?.documentos) {
       cargarTodosLosArchivos();
@@ -118,7 +123,7 @@ const ArchivosModal = ({ open, onClose, scout }) => {
   const cargarTodosLosArchivos = async () => {
     setLoading(true);
     let mapa = {};
-    for (const docId of scout.documentos) {
+    for (const docId of (scout.documentos || [])) {
       const folderPath = `${scout.id}/${docId}`;
       const { data } = await supabase.storage.from('documentos').list(folderPath);
       mapa[docId] = data?.filter(f => f.name !== '.emptyFolderPlaceholder') || [];
@@ -165,7 +170,7 @@ const ArchivosModal = ({ open, onClose, scout }) => {
                     </ListItem>
                   ))
                 ) : (
-                  <Typography variant="caption" sx={{ px: 2, pb: 1, fontStyle: 'italic' }}>Sin archivos</Typography>
+                  <Typography variant="caption" sx={{ px: 2, pb: 1, fontStyle: 'italic', display: 'block', textAlign: 'center' }}>Sin archivos</Typography>
                 )}
                 <Divider />
               </Box>
@@ -194,20 +199,90 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
   };
 
   const handleConfirmarFirma = async (datosFirma) => {
+    if (!scoutSeleccionado) return;
+
     const ahora = new Date().toLocaleDateString('es-AR');
     try {
-      await onUpdateScout(scoutSeleccionado.id, scoutSeleccionado.etapa, {
-        avaladoPorEducadores: true,
-        educadorAvalista: datosFirma.aclaracion,
-        educadorDNI: datosFirma.dni,
-        firmaDigitalImg: datosFirma.firmaImg,
-        fechaAval: ahora
-      });
+      // 🎯 ESTRICTO POR FUNCIÓN (Corregido para leer Array 'funciones')
+      const esJefe = Array.isArray(user?.funciones) ? user.funciones.some(f => f.includes('JEFE')) : false;
+
+      const camposAval = {
+        // 1. Si es educador, pisamos el genérico SIEMPRE (para salidas y eventos).
+        // Si es Jefe, solo lo pisamos si el genérico estaba vacío.
+        ...((!esJefe || !scoutSeleccionado.firmaDigitalImg) && {
+          firmaDigitalImg: datosFirma.firmaImg,
+          educadorAvalista: datosFirma.aclaracion,
+          educadorDNI: datosFirma.dni,
+        }),
+
+        // 2. Guardamos la copia en el cajón específico
+        ...(esJefe ? {
+          aval_jefe_firma: datosFirma.firmaImg,
+          aval_jefe_aclaracion: datosFirma.aclaracion,
+          aval_jefe_dni: datosFirma.dni
+        } : {
+          aval_educador_firma: datosFirma.firmaImg,
+          aval_educador_aclaracion: datosFirma.aclaracion,
+          aval_educador_dni: datosFirma.dni
+        })
+      };
+
+      // 3. MATEMÁTICA DE AVAL (¿Está 100% completo?)
+      const tieneIngreso = scoutSeleccionado.documentos?.includes('ingreso_menores');
+      const tieneJefeFirma = esJefe ? true : !!scoutSeleccionado.aval_jefe_firma;
+      const tieneEduFirma = !esJefe ? true : !!scoutSeleccionado.aval_educador_firma;
+
+      let estaCompletamenteAvalado = false;
+      if (tieneIngreso) {
+        estaCompletamenteAvalado = tieneJefeFirma && tieneEduFirma;
+      } else {
+        estaCompletamenteAvalado = true; // Si no hay ingreso, la firma actual alcanza
+      }
+
+      const pibeAvalado = {
+        ...scoutSeleccionado,
+        ...camposAval,
+        avaladoPorEducadores: estaCompletamenteAvalado,
+        fechaAval: ahora,
+        ultimaModificacion: new Date()
+      };
+
+      await onUpdateScout(pibeAvalado);
+
+      const mapeoGeneradores = {
+        ingreso_menores: () => generarFichaIngresoPDF(pibeAvalado, true),
+        salidas_cercanas: () => generarSalidasCercanasPDF(pibeAvalado, true),
+        auto_campamento_menor: () => generarAutorizacionEventoPDF(pibeAvalado, true),
+        ddjj_campamento_mayor: () => generarDdjjMayoresPDF(pibeAvalado, true)
+      };
+
+      for (const docId of (pibeAvalado.documentos || [])) {
+        if (mapeoGeneradores[docId]) {
+          const folderPath = `${pibeAvalado.id}/${docId}`;
+          const { data: existingFiles } = await supabase.storage.from('documentos').list(folderPath);
+          const validFiles = existingFiles?.filter(f => f.name !== '.emptyFolderPlaceholder') || [];
+
+          let fileNameToUse = `${docId}_firmado.pdf`;
+          if (validFiles.length > 0) fileNameToUse = validFiles[0].name;
+
+          const filePath = `${folderPath}/${fileNameToUse}`;
+          const blobNuevo = mapeoGeneradores[docId]();
+
+          await supabase.storage.from('documentos').upload(filePath, blobNuevo, {
+            upsert: true,
+            contentType: 'application/pdf'
+          });
+        }
+      }
+
       setFirmaModalOpen(false);
       setExpedienteOpen(false);
-      alert("¡Legajo Avalado!");
+      alert(estaCompletamenteAvalado
+        ? "¡Aval guardado correctamente! Los PDFs fueron actualizados."
+        : "Firma registrada exitosamente. Se aguarda la firma del otro educador para completar el legajo.");
     } catch (error) {
-      alert("Error: " + error.message);
+      console.error("Error al persistir el aval:", error);
+      alert("Error al guardar el aval: " + error.message);
     }
   };
 
@@ -248,9 +323,22 @@ export const DocumentosView = ({ scouts = [], ramaId = 'CAMINANTES', onUpdateSco
         ))}
       </Grid>
 
-      <FichaScout open={expedienteOpen} onClose={() => setExpedienteOpen(false)} scout={scoutSeleccionado} onAvalarIngreso={() => setFirmaModalOpen(true)} />
+      <FichaScout
+        open={expedienteOpen}
+        onClose={() => setExpedienteOpen(false)}
+        scout={scoutSeleccionado}
+        onAvalarIngreso={(s) => { setScoutSeleccionado(s); setFirmaModalOpen(true); }}
+      />
+
       <ArchivosModal open={docsModalOpen} onClose={() => setDocsModalOpen(false)} scout={scoutSeleccionado} />
-      <FirmaDigitalModal open={firmaModalOpen} onClose={() => setFirmaModalOpen(false)} onConfirm={handleConfirmarFirma} user={user} />
+
+      <FirmaDigitalModal
+        open={firmaModalOpen}
+        onClose={() => setFirmaModalOpen(false)}
+        onConfirm={handleConfirmarFirma}
+        user={user}
+        titulo="Firma de Aval Institucional"
+      />
     </Box>
   );
 };

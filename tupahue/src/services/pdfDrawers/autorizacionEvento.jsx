@@ -4,7 +4,6 @@ import {
 } from './common';
 
 export const drawAutorizacionEventoPage = (doc, scout, datos, margin = MARGEN_BASE) => {
-  // 1. ENCABEZADO
   drawHeader(
     doc, 
     "Autorización de Padres / Madres / Tutores", 
@@ -15,13 +14,11 @@ export const drawAutorizacionEventoPage = (doc, scout, datos, margin = MARGEN_BA
 
   let y = 45;
 
-  // 2. TÍTULOS
   drawCenteredText(doc, "AUTORIZACIÓN DE PADRES / MADRES / TUTORES", y, 11, 'bold');
   drawCenteredText(doc, `PARA ${datos.tipoActividad || 'SALIDAS, ACANTONAMIENTOS Y/O CAMPAMENTOS'}`, y + 5, 11, 'bold');
   
   y += 18;
 
-  // 3. CUERPO LEGAL
   const tutor = datos.tutorInfo || {};
   const nombreTutor = (tutor.nombre || "___________________________").toUpperCase();
   const nombreScout = `${scout.nombre} ${scout.apellido}`.toUpperCase();
@@ -38,7 +35,6 @@ export const drawAutorizacionEventoPage = (doc, scout, datos, margin = MARGEN_BA
 
   y = drawJustifiedParagraph(doc, legalText, y, 9, margin, 1.4);
 
-  // 4. FIRMA DEL TUTOR
   y += 20;
   const datosFirmas = {
     ...datos,
@@ -48,8 +44,7 @@ export const drawAutorizacionEventoPage = (doc, scout, datos, margin = MARGEN_BA
   };
   drawSignatures(doc, y, datosFirmas, margin);
 
-  // 5. 🎯 CORRECCIÓN ESTÉTICA DEFINITIVA: RECUADRO DE AVAL SCOUT
-  // Bajamos más (y += 50) para asegurar que no pise la aclaración/fecha del padre
+  // 🎯 CAJA DE AVAL ORDENADA
   y += 50; 
   doc.setDrawColor(0);
   doc.setLineWidth(0.3);
@@ -59,30 +54,29 @@ export const drawAutorizacionEventoPage = (doc, scout, datos, margin = MARGEN_BA
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("AVAL DE LOS RESPONSABLES SCOUTS (4)", margin + 5, y + 8);
+  doc.text("AVAL DE LOS RESPONSABLES SCOUTS (4)", margin + 5, y + 6);
   
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   
   const avalText = `Certifico que el/la Menor registrado/a en la categoría de Protagonista, posee el Legajo Personal completo según el capitulo 4, del Manual General de Normas de SAAC y que la persona que está otorgando autorización tiene su firma registrada en la "AUTORIZACIÓN DE INGRESO DE NIÑOS, NIÑAS Y JÓVENES MENORES DE 18 AÑOS".-`;
 
-  // Forzamos el corte de texto con un padding interno de 5mm por lado (10mm total)
   const anchoTextoInterno = recuadroAncho - 10;
-  const lineasAval = doc.splitTextToSize(avalText, anchoTextoInterno);
-  
-  // Dibujamos el texto dentro del cuadro respetando el margen interno
-  doc.text(lineasAval, margin + 5, y + 15, { align: 'justify', maxWidth: anchoTextoInterno });
+  doc.text(doc.splitTextToSize(avalText, anchoTextoInterno), margin + 5, y + 12, { align: 'justify', maxWidth: anchoTextoInterno });
 
-  // Alinear las líneas de firma y aclaración dentro del recuadro
-  let yFirmasAval = y + 35;
-  doc.text("Firma: ___________________________", margin + 5, yFirmasAval);
-  
-  const columnaDerechaX = margin + (recuadroAncho * 0.55); 
-  doc.text("Aclaración: .....................................................", columnaDerechaX, yFirmasAval - 5);
-  doc.text("DNI: ...........................................................", columnaDerechaX, yFirmasAval);
-  doc.text("Función: .....................................................", columnaDerechaX, yFirmasAval + 5);
+  // 🎯 Firma en el espacio del medio
+  if (scout.firmaDigitalImg) {
+    doc.addImage(scout.firmaDigitalImg, 'PNG', margin + 15, y + 18, 35, 14);
+  }
 
-  // 6. PIE DE PÁGINA INSTITUCIONAL
+  // 🎯 Columnas inferiores para datos
+  let yF = y + 34;
+  const colX = margin + (recuadroAncho * 0.55); 
+  doc.text("Firma: ___________________________", margin + 5, yF);
+  doc.text(`Aclaración: ${scout.educadorAvalista || '.............................................'}`, colX, yF);
+  doc.text(`DNI: ${scout.educadorDNI || '...........................'}`, margin + 5, yF + 8);
+  doc.text("Función: Educador/a Responsable", colX, yF + 8);
+
   const footerY = 278;
   doc.setDrawColor(0, 91, 150);
   doc.setLineWidth(0.5);

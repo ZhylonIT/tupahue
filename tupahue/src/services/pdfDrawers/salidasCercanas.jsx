@@ -20,7 +20,6 @@ export const drawSalidasCercanasPage = (doc, scout, datos, margin = MARGEN_BASE)
   
   const cuerpo = `En la localidad de ${datos.localidad}, provincia de ${datos.provincia}, partido de ${datos.partido}, a los ${datos.dia} días del mes de ${datos.mes} del año ${datos.anio}, yo ${datos.tutorNombre} con DNI ${datos.tutorDni} con domicilio en ${datos.tutorDomicilio} y teléfono ${datos.tutorTelefono}, en mi carácter de ${datos.tutorVinculo}, OTORGO AUTORIZACIÓN PARA QUE EL/LA MENOR ${scout.nombre} ${scout.apellido} con DNI ${scout.dni} y domicilio en ${datos.scoutDomicilio}, para salir de la sede del Grupo Scout N° 996 del Distrito 3 (Zona 8) perteneciente a la Zona 8 de Scouts de Argentina Asociación Civil, durante el presente año ${datos.anio}.`;
 
-  // 🎯 El drawer ahora envía el margen correcto
   y = drawJustifiedParagraph(doc, cuerpo, y, 10, margin, 1.5);
 
   y += 10; 
@@ -34,20 +33,29 @@ export const drawSalidasCercanasPage = (doc, scout, datos, margin = MARGEN_BASE)
   drawSectionTitle(doc, "IV. AVAL DE LOS RESPONSABLES SCOUTS", y, margin);
   y += 7;
   doc.setLineWidth(0.3);
-  doc.rect(margin, y, anchoImprimible, 38);
+  
+  // 🎯 Agrandamos la caja a 50 de alto para que haya mucho espacio interior
+  doc.rect(margin, y, anchoImprimible, 50); 
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   
-  // Justificamos también el texto pequeño del aval
   const textoAval = "Certifico que el/la Menor posee el Legajo Personal completo según el capitulo 4, del Manual General de Normas de SAAC y que la persona que está otorgando autorización tiene su firma registrada en la autorización de ingreso.";
   doc.text(doc.splitTextToSize(textoAval, anchoImprimible - 6), margin + 3, y + 6, { align: "justify", maxWidth: anchoImprimible - 6 });
   
   doc.setFontSize(9);
-  doc.text("Firma Educador: ___________________________", margin + 3, y + 20);
-  doc.text("Aclaración: ___________________________", 110, y + 20);
-  doc.text("DNI: ___________________________", margin + 3, y + 30);
-  doc.text("Función: Jefe de Unidad/Grupo", 110, y + 30);
 
-  // Firmas al pie en posición fija para evitar solapamientos
+  // 1. Dibujamos los textos fijos primero
+  doc.text("Firma Educador: ___________________________", margin + 3, y + 38);
+  doc.text(`Aclaración: ${scout.educadorAvalista || '___________________________'}`, 110, y + 38);
+  doc.text(`DNI: ${scout.educadorDNI || '___________________________'}`, margin + 3, y + 46);
+  doc.text("Función: Educador/a Responsable", 110, y + 46);
+
+  // 2. 🎯 Estampamos la firma EXACTAMENTE sobre la línea punteada
+  if (scout.firmaDigitalImg) {
+    // X = margin + 28 (Arranca después del texto "Firma Educador:")
+    // Y = y + 22 (La base de la imagen, de 15px de alto, se apoya cerca del renglón 38)
+    doc.addImage(scout.firmaDigitalImg, 'PNG', margin + 28, y + 22, 35, 15);
+  }
+
   drawSignatures(doc, 230, datos, margin); 
 };

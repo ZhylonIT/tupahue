@@ -9,16 +9,16 @@ export const useAdultos = () => {
   const fetchAdultos = useCallback(async () => {
     setLoading(true);
     try {
+      // Ahora consultamos la nómina de adultos
       const { data, error } = await supabase
-        .from('profiles')
+        .from('adultos')
         .select('*')
-        .or(`role.eq.${ROLES.EDUCADOR},role.eq.ADMIN`)
         .order('apellido', { ascending: true });
 
       if (error) throw error;
       setAdultos(data || []);
     } catch (e) {
-      console.error("Error cargando adultos:", e.message);
+      console.error("Error cargando nómina de adultos:", e.message);
     } finally {
       setLoading(false);
     }
@@ -30,59 +30,46 @@ export const useAdultos = () => {
 
   const agregarAdulto = async (nuevo) => {
     try {
-      // 🎯 1. Verificamos si ya existe un perfil con ese DNI
-      const { data: existente, error: searchError } = await supabase
-        .from('profiles')
-        .select('id, funciones, role, formacion, planDesempeño')
+      // 1. Verificamos si ya está en la nómina
+      const { data: existente } = await supabase
+        .from('adultos')
+        .select('id, user_id')
         .eq('dni', nuevo.dni)
-        .maybeSingle(); // Usamos maybeSingle para que no tire error si no hay nada
-
-      if (searchError) throw searchError;
+        .maybeSingle();
 
       if (existente) {
-        // 🎯 2. LÓGICA DE ROL DUAL: Si existe, actualizamos sin borrar el pasado
-        let nuevasFunciones = [...(existente.funciones || [])];
-        
-        // Si el usuario era Familia, nos aseguramos de que 'FAMILIA' esté en sus funciones
-        if (existente.role === ROLES.FAMILIA && !nuevasFunciones.includes(ROLES.FAMILIA)) {
-          nuevasFunciones.push(ROLES.FAMILIA);
-        }
-
-        // Sumamos las nuevas funciones de educador (sin duplicar)
-        nuevasFunciones = Array.from(new Set([...nuevasFunciones, ...(nuevo.funciones || [])]));
-        
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            nombre: nuevo.nombre,
-            apellido: nuevo.apellido,
-            role: ROLES.EDUCADOR, // Sube a nivel gestión
-            funciones: nuevasFunciones,
-            // Mantenemos su historial si ya lo tenía
-            formacion: existente.formacion || [],
-            "planDesempeño": existente.planDesempeño || { objetivos: '', acuerdos: '' }
-          })
-          .eq('id', existente.id);
-
-        if (updateError) throw updateError;
-        alert("El usuario ya existía. Ahora tiene acceso dual (Educador + Familia).");
-      } else {
-        // 🎯 3. Si no existe, registro limpio de cero
-        const record = {
-          dni: nuevo.dni,
-          nombre: nuevo.nombre,
-          apellido: nuevo.apellido,
-          role: ROLES.EDUCADOR,
-          funciones: nuevo.funciones || [],
-          formacion: [],
-          "planDesempeño": { objetivos: '', acuerdos: '' }
-        };
-
-        const { error: insertError } = await supabase.from('profiles').insert([record]);
-        if (insertError) throw insertError;
-        alert("Educador registrado correctamente.");
+        alert("Este DNI ya figura en la nómina de adultos.");
+        return;
       }
+
+      // 2. Insertamos en la tabla 'adultos' (No requiere ID de Auth)
+      const record = {
+        dni: nuevo.dni,
+        nombre: nuevo.nombre,
+        apellido: nuevo.apellido,
+        funciones: nuevo.funciones || [],
+        formacion: [],
+        "planDesempeño": { objetivos: '', acuerdos: '' }
+      };
+
+      const { error: insertError } = await supabase.from('adultos').insert([record]);
       
+      if (insertError) throw insertError;
+
+      // 3. (Opcional) Si el usuario ya tenía cuenta (ej. es Padre), actualizamos su rol en profiles
+      const { data: userProfile } = await supabase.from('profiles').select('id, funciones').eq('dni', nuevo.dni).maybeSingle();
+      if (userProfile) {
+        const nuevasFunc = [...new Set([...(userProfile.funciones || []), ...record.funciones])];
+        await supabase.from('profiles').update({ 
+          role: ROLES.EDUCADOR,
+          funciones: nuevasFunc
+        }).eq('id', userProfile.id);
+        
+        // Vinculamos la nómina con el perfil existente
+        await supabase.from('adultos').update({ user_id: userProfile.id }).eq('dni', nuevo.dni);
+      }
+
+      alert("Educador añadido a la nómina correctamente.");
       await fetchAdultos();
     } catch (e) {
       console.error("Error en alta:", e);
@@ -100,50 +87,35 @@ export const useAdultos = () => {
       : [...(adulto.formacion || []), experienciaId];
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ formacion: nuevaFormacion })
-        .eq('id', adultoId);
-      
+      const { error } = await supabase.from('adultos').update({ formacion: nuevaFormacion }).eq('id', adultoId);
       if (error) throw error;
       setAdultos(prev => prev.map(a => a.id === adultoId ? { ...a, formacion: nuevaFormacion } : a));
     } catch (e) {
-      console.error("Error actualización formación:", e);
+      console.error("Error formación:", e);
     }
   };
 
   const actualizarPlanDesempeño = async (adultoId, dataPlan) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ "planDesempeño": dataPlan })
-        .eq('id', adultoId);
-      
+      const { error } = await supabase.from('adultos').update({ "planDesempeño": dataPlan }).eq('id', adultoId);
       if (error) throw error;
       setAdultos(prev => prev.map(a => a.id === adultoId ? { ...a, "planDesempeño": dataPlan } : a));
     } catch (e) {
-      console.error("Error actualización plan desempeño:", e);
+      console.error("Error plan desempeño:", e);
     }
   };
 
   const eliminarAdulto = async (id) => {
-    if (window.confirm("¿Estás seguro de eliminar este educador del sistema?")) {
+    if (window.confirm("¿Estás seguro de eliminar este educador de la nómina?")) {
       try {
-        const { error } = await supabase.from('profiles').delete().eq('id', id);
+        const { error } = await supabase.from('adultos').delete().eq('id', id);
         if (error) throw error;
         setAdultos(prev => prev.filter(a => a.id !== id));
       } catch (e) {
-        alert("No se pudo eliminar el perfil: " + e.message);
+        alert("Error: " + e.message);
       }
     }
   };
 
-  return { 
-    adultos, 
-    loading,
-    agregarAdulto, 
-    actualizarFormacion, 
-    actualizarPlanDesempeño, 
-    eliminarAdulto 
-  };
+  return { adultos, loading, agregarAdulto, actualizarFormacion, actualizarPlanDesempeño, eliminarAdulto };
 };

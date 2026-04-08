@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Grid, 
   TextField, MenuItem, IconButton, Stack, CircularProgress, Alert, 
-  FormControlLabel, Checkbox, Paper, Divider, Typography 
+  FormControlLabel, Checkbox, Paper, Typography 
 } from '@mui/material';
 import { Close, Save, Visibility } from '@mui/icons-material';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { generarAutorizacionEventoPDF } from '../../services/pdfService'; // Luego registraremos la de mayores aquí
+// 🎯 CORRECCIÓN: Importamos la función correcta
+import { generarDdjjMayoresPDF } from '../../services/pdfService'; 
 
 export const FichaDDJJMayoresForm = ({ open, onClose, scout, onSave }) => {
   const { user } = useAuth();
@@ -43,31 +44,48 @@ export const FichaDDJJMayoresForm = ({ open, onClose, scout, onSave }) => {
     }));
   };
 
-  const handleGuardar = async () => {
-    setLoading(true);
+  // 🎯 NUEVO: Función para previsualizar el PDF sin guardar
+  const handlePreview = async () => {
     try {
-      // Como es mayor, los datos de "tutor" son sus propios datos
       const datosCompletos = { 
         ...datos, 
         scoutNacionalidad: scout.datosPersonales?.nacionalidad || 'Argentina',
         scoutDomicilio: scout.datosMedicos?.domicilio || '',
-        firmaJoven: user?.firma_url, // Firma del Rover
+        firmaJoven: user?.firma_url, 
+        fechaFirmaJoven: new Date().toLocaleDateString('es-AR')
+      };
+      const tempScout = { ...scout, datosEvento: datosCompletos };
+      
+      const pdfBlob = await generarDdjjMayoresPDF(tempScout, true);
+      const fileURL = URL.createObjectURL(pdfBlob);
+      window.open(fileURL, '_blank');
+    } catch (error) {
+      console.error(error);
+      alert("Error al generar la vista previa.");
+    }
+  };
+
+  const handleGuardar = async () => {
+    setLoading(true);
+    try {
+      const datosCompletos = { 
+        ...datos, 
+        scoutNacionalidad: scout.datosPersonales?.nacionalidad || 'Argentina',
+        scoutDomicilio: scout.datosMedicos?.domicilio || '',
+        firmaJoven: user?.firma_url, 
         fechaFirmaJoven: new Date().toLocaleDateString('es-AR')
       };
 
       const hijoActualizado = { ...scout, datosEvento: datosCompletos };
 
-      // 1. Generar Blob (Usaremos el servicio que ya conoce el drawer de mayores)
-      // Nota: En el siguiente paso agregaremos 'generarDDJJMayoresPDF' al service
-      const pdfBlob = await generarAutorizacionEventoPDF(hijoActualizado, true);
+      // 🎯 CORRECCIÓN: Usamos generarDdjjMayoresPDF
+      const pdfBlob = await generarDdjjMayoresPDF(hijoActualizado, true);
 
-      // 2. Subir a Storage
       const filePath = `${scout.id}/ddjj_campamento_mayor/ddjj_campamento_mayor.pdf`;
       await supabase.storage.from('documentos').upload(filePath, pdfBlob, {
         contentType: 'application/pdf', upsert: true
       });
 
-      // 3. Guardar en DB
       await onSave(hijoActualizado, 'ddjj_campamento_mayor');
       setSuccess(true);
     } catch (error) {
@@ -89,7 +107,6 @@ export const FichaDDJJMayoresForm = ({ open, onClose, scout, onSave }) => {
         {success && <Alert severity="success" sx={{ mb: 2, fontWeight: 700 }}>¡Declaración jurada guardada y subida!</Alert>}
         
         <Grid container spacing={3} sx={{ pt: 1 }}>
-          {/* DATOS DEL EVENTO */}
           <Grid item xs={12} md={6}>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, color: '#455a64' }}>Información de la Actividad</Typography>
@@ -109,7 +126,6 @@ export const FichaDDJJMayoresForm = ({ open, onClose, scout, onSave }) => {
             </Paper>
           </Grid>
 
-          {/* TRANSPORTE */}
           <Grid item xs={12} md={6}>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 2, color: '#455a64' }}>Logística y Transporte</Typography>
@@ -134,17 +150,29 @@ export const FichaDDJJMayoresForm = ({ open, onClose, scout, onSave }) => {
         </Grid>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, bgcolor: '#f8f9fa' }}>
-        <Button onClick={onClose} sx={{ fontWeight: 'bold' }}>Cerrar</Button>
-        <Button 
-          variant="contained" 
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />} 
-          onClick={handleGuardar} 
-          disabled={loading || !datos.lugarDestino || success}
-          sx={{ bgcolor: '#455a64', fontWeight: 'bold', px: 4 }}
-        >
-          {loading ? 'Generando...' : 'Firmar y Guardar'}
-        </Button>
+      <DialogActions sx={{ p: 3, bgcolor: '#f8f9fa', justifyContent: 'space-between' }}>
+        <Button onClick={onClose} sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Cerrar</Button>
+        <Stack direction="row" spacing={2}>
+          {/* 🎯 BOTÓN DE PREVISUALIZAR */}
+          <Button 
+            variant="outlined" 
+            startIcon={<Visibility />} 
+            onClick={handlePreview}
+            disabled={!datos.lugarDestino}
+            sx={{ fontWeight: 'bold', color: '#5A189A', borderColor: '#5A189A' }}
+          >
+            Previsualizar
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />} 
+            onClick={handleGuardar} 
+            disabled={loading || !datos.lugarDestino || success}
+            sx={{ bgcolor: '#455a64', fontWeight: 'bold', px: 4 }}
+          >
+            {loading ? 'Generando...' : 'Firmar y Guardar'}
+          </Button>
+        </Stack>
       </DialogActions>
     </Dialog>
   );

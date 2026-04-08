@@ -17,8 +17,9 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
   const [scoutSeleccionado, setScoutSeleccionado] = useState(null);
 
   const fetchData = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
+    // 🛡️ Si no hay usuario ni función aún, apagamos el loading de seguridad y esperamos.
+    if (!user?.id || !funcionActual) {
+      if (!user?.id) setLoading(false); 
       return;
     }
 
@@ -27,7 +28,6 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
       let qScouts = supabase.from('scouts').select('*');
       let qProy = supabase.from('proyectos').select('*');
 
-      // 🎯 FILTRADO DINÁMICO SEGÚN LA FUNCIÓN ACTIVA
       if (funcionActual === ROLES.FAMILIA) {
         qScouts = qScouts.eq('padre_id', user.id);
       } else if (funcionActual?.startsWith('PROTAGONISTA_')) {
@@ -51,10 +51,27 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
     } finally {
       setLoading(false);
     }
-    // 🎯 RE-EJECUTAR SI CAMBIA LA FUNCIÓN (SWITCH DE ROL)
-  }, [user?.id, user?.role, funcionActual]);
+  }, [user?.id, funcionActual]); // Eliminado user?.role para evitar disparos dobles
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSaveScout = async (d) => {
+    const idParaActualizar = d.id;
+    const { id: _, ...payload } = d;
+    if (idParaActualizar) {      
+      const { error } = await supabase.from('scouts').update({ ...payload, ultimaModificacion: new Date() }).eq('id', idParaActualizar);
+      if (error) throw error;
+      setScouts(prev => prev.map(s => s.id === idParaActualizar ? { ...s, ...d } : s));
+    } else {    
+      const r = (d.rama || ramaActiva).toUpperCase();
+      const n = { ...payload, rama: r, etapa: RAMAS[r]?.etapas[0]?.id || 'tierra', presente: false };
+      const { data, error } = await supabase.from('scouts').insert([n]).select();
+      if (error) throw error;
+      if (data) setScouts(prev => [...prev, data[0]]);
+    }
+    setIsFormOpen(false);
+    setScoutSeleccionado(null);
+  };
 
   const handlers = {
     handleOpenForm: (scout = null) => { setScoutSeleccionado(scout); setIsFormOpen(true); },
@@ -113,28 +130,6 @@ export const useDashboard = (user, datosIniciales = [], eventosIniciales = [], f
       await supabase.from('proyectos').update(p).eq('id', id);
       setProyectos(prev => prev.map(x => x.id === id ? { ...x, ...p } : x));
     }
-  };
-
-  const handleSaveScout = async (d) => {
-    // 🎯 Aseguramos que d tenga el ID para la actualización
-    const { id, ...payload } = d;
-
-    if (id) {      
-      const { error } = await supabase.from('scouts').update(payload).eq('id', id);
-      if (error) {
-        console.error("Error actualizando scout:", error);
-        throw error;
-      }      
-      setScouts(prev => prev.map(s => s.id === id ? { ...s, ...d } : s));
-    } else {    
-      const r = (d.rama || ramaActiva).toUpperCase();
-      const n = { ...payload, rama: r, etapa: RAMAS[r]?.etapas[0]?.id || 'tierra', presente: false };
-      const { data } = await supabase.from('scouts').insert([n]).select();
-      if (data) setScouts(prev => [...prev, data[0]]);
-    }
-
-    setIsFormOpen(false);
-    setScoutSeleccionado(null);
   };
 
   const handleSaveProyecto = async (d) => {

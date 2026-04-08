@@ -277,3 +277,39 @@ Limpieza Implacable: Se implementó una función sanitizeDni que extrae estricta
 Upsert Seguro: Se reemplazó la lógica destructiva (.delete()) al encontrar perfiles existentes por un .upsert(), protegiendo la integridad referencial (Foreign Keys) de la base de datos.
 
 Auto-Reparación de Vínculos: Se mejoró la lógica de inicio de sesión para que, si un usuario entra y su user_id quedó huérfano en la tabla scouts, el sistema lo busque por DNI y lo vuelva a enlazar de forma transparente en segundo plano.
+
+Log de Resolución: Persistencia de Fichas Médicas (Doble Rol)
+1. Diagnóstico del Error de Prop Drilling
+Problema: El error onUpdateScout is not a function ocurría porque el usuario con doble rol (Educador que actúa como Familia) renderiza su panel desde DashboardPage.jsx (Educador) y no desde FamiliaDashboardPage.jsx.
+
+Causa: En la cadena de componentes DashboardPage -> EducadorMainView -> DocumentacionFamiliaView, la función de guardado handleSaveScout se perdía porque no estaba siendo pasada como prop en el componente intermedio.
+
+Solución: Se inyectó la prop handleSaveScout desde el dashboard principal y se mapeó como onUpdateScout en el switch de vistas del Educador.
+
+2. Diagnóstico de Base de Datos (RLS)
+Problema: Error 400 (Bad Request) al intentar actualizar la tabla scouts.
+
+Causa: La tabla scouts no tenía una política de seguridad (Row Level Security) que permitiera a un usuario con rol EDUCADOR editar un registro basándose en el campo padre_id. Supabase solo reconocía al "Joven" como dueño del dato o al "Admin" como gestor, pero bloqueaba al "Padre" (y más aún si el token decía 'Educador').
+
+Solución: Se creó una nueva política SQL que permite la actualización (UPDATE) si el auth.uid() coincide con el padre_id del registro, independientemente del rol que figure en el perfil.
+
+3. Ajustes de Código Realizados
+DashboardPage.jsx: Se agregó la prop handleSaveScout={state.handleSaveScout} al llamar a <EducadorMainView />.
+
+src/views/educador/index.js:
+
+Se recibió handleSaveScout en la desestructuración de props.
+
+En el caso DOCUMENTACION, se pasó la función: <DocumentacionFamiliaView hijo={hijoActivo} onUpdateScout={handleSaveScout} />.
+
+AuthContext.jsx: Se restauró a la versión estable eliminando intentos fallidos de consultas a columnas inexistentes (dni_padre_referencia).
+
+Estado Actual:
+
+✅ Carga de Archivos: El PDF se genera y se sube correctamente al storage.
+
+✅ Persistencia: La tabla scouts se actualiza con el nuevo array de documentos y los datos médicos.
+
+✅ React Context: El estado local se sincroniza y muestra el check de "Digitalizado" sin necesidad de refrescar.
+
+proximo paso: avales en legajos.

@@ -4,7 +4,6 @@ import {
 } from './common';
 
 export const drawDdjjMayoresPage = (doc, scout, datos, margin = MARGEN_BASE) => {
-  // 1. ENCABEZADO
   drawHeader(
     doc, 
     "Declaración Jurada para Participación de Jóvenes", 
@@ -15,14 +14,12 @@ export const drawDdjjMayoresPage = (doc, scout, datos, margin = MARGEN_BASE) => 
 
   let y = 45;
 
-  // 2. TÍTULOS
   drawCenteredText(doc, "DECLARACIÓN JURADA PARA PARTICIPACIÓN DE", y, 11, 'bold');
   drawCenteredText(doc, "JÓVENES MAYORES DE 18 AÑOS EN", y + 5, 11, 'bold');
   drawCenteredText(doc, "SALIDAS – ACANTONAMIENTOS – CAMPAMENTOS", y + 10, 11, 'bold');
   
   y += 22;
 
-  // 3. CUERPO LEGAL (Auto-autorización)
   const nombreScout = `${scout.nombre} ${scout.apellido}`.toUpperCase();
   const fDesde = datos.fechaDesde ? datos.fechaDesde.split('-').reverse().join('/') : '___/___/___';
   const fHasta = datos.fechaHasta ? datos.fechaHasta.split('-').reverse().join('/') : '___/___/___';
@@ -33,7 +30,6 @@ export const drawDdjjMayoresPage = (doc, scout, datos, margin = MARGEN_BASE) => 
 
   y += 10;
 
-  // 4. SECCIÓN TRANSPORTE (Específica de Mayores)
   doc.setFont("helvetica", "bold");
   doc.text(`Utilizaré el medio de transporte contratado por el Grupo Scout: ${datos.usaTransporteGrupo ? 'SI' : 'NO'}`, margin, y);
   y += 6;
@@ -51,32 +47,36 @@ export const drawDdjjMayoresPage = (doc, scout, datos, margin = MARGEN_BASE) => 
     y += 5;
   }
 
-  // 5. COMPROMISOS
   const compromisos = `Asimismo, informo que:\n1) Notificaré a mi padre/madre de las actividades que realizaré y el lugar donde se desarrollarán las mismas.\n2) A los efectos de la organización interna de Scouts de Argentina Asociación Civil y evaluar la cobertura de las Pólizas contratadas por esta entidad, daré notificación a mi Jefe/a de Unidad o Jefe/a de Grupo de las actividades a realizar.`;
   y = drawJustifiedParagraph(doc, compromisos, y, 9, margin, 1.4);
 
-  // 6. FIRMA DEL JOVEN (ROVER)
   y += 25;
   const datosFirmas = {
     ...datos,
-    aclaracionPadre: nombreScout, // En este caso firma el joven
+    aclaracionPadre: nombreScout, 
     dniPadre: scout.dni,
-    firmaPadre: scout.firma_url || datos.firmaJoven // Asumimos que el Rover tiene su firma en su perfil
+    firmaPadre: scout.firma_url || datos.firmaJoven 
   };
   drawSignatures(doc, y, datosFirmas, margin);
 
-  // 7. AVAL SCOUT (Simplificado según foto)
+  // 🎯 CAJA DE AVAL ORDENADA
   y += 45;
   const recuadroAncho = PAG_ANCHO - (margin * 2);
   doc.setDrawColor(0);
-  doc.rect(margin, y, recuadroAncho, 40);
+  doc.rect(margin, y, recuadroAncho, 45); // Agrandamos
   doc.setFont("helvetica", "bold");
-  doc.text("AVAL DE LOS RESPONSABLES SCOUTS (2)", margin + 5, y + 8);
+  doc.text("AVAL DE LOS RESPONSABLES SCOUTS (2)", margin + 5, y + 6);
   doc.setFont("helvetica", "normal");
-  doc.text(`Certifico que el/la miembro Beneficiario/a, posee el Legajo Personal completo según el capítulo 4 del Manual General de Normas de SAAC.`, margin + 5, y + 18, { maxWidth: recuadroAncho - 10 });
+  doc.text(`Certifico que el/la miembro Beneficiario/a, posee el Legajo Personal completo según el capítulo 4 del Manual General de Normas de SAAC.`, margin + 5, y + 12, { maxWidth: recuadroAncho - 10 });
 
-  doc.text("Firma: ___________________________", margin + 5, y + 32);
-  doc.text("Aclaración: ___________________________", margin + 75, y + 28);
-  doc.text("DNI: ___________________________", margin + 75, y + 33);
-  doc.text("Función en el Grupo Scout: ___________________________", margin + 75, y + 38);
+  // 🎯 Imagen en el medio
+  if (scout.firmaDigitalImg) {
+    doc.addImage(scout.firmaDigitalImg, 'PNG', margin + 15, y + 16, 35, 14);
+  }
+
+  // 🎯 Datos abajo
+  doc.text("Firma: ___________________________", margin + 5, y + 34);
+  doc.text(`Aclaración: ${scout.educadorAvalista || '___________________________'}`, margin + 85, y + 34);
+  doc.text(`DNI: ${scout.educadorDNI || '___________________________'}`, margin + 5, y + 42);
+  doc.text("Función en el Grupo Scout: Educador/a Responsable", margin + 85, y + 42);
 };
